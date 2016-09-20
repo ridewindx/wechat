@@ -1,4 +1,4 @@
-package wechat
+package public
 
 import "fmt"
 
@@ -9,10 +9,10 @@ const (
 )
 
 type Error struct {
-    code int  `json:"errcode"`
-    msg string `json:"errmsg"`
+    Code int  `json:"errcode"`
+    Msg  string `json:"errmsg"`
 }
 
 func (err *Error) Error() string {
-    return fmt.Sprintf("errcode: %d, errmsg: %s", err.code, err.msg)
+    return fmt.Sprintf("errcode: %d, errmsg: %s", err.Code, err.Msg)
 }
