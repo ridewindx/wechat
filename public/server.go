@@ -11,6 +11,7 @@ import (
 	"crypto/sha1"
 	"encoding/hex"
 	"crypto/subtle"
+	"strconv"
 )
 
 type Server struct {
@@ -128,31 +129,65 @@ func NewServer() *Server {
 		Mel: mel.New(),
 	}
 
-	srv.Get("/", func(c *mel.Context) {
+	validateSign := func(c *mel.Context) bool {
 		signature := c.Query("signature")
 		timestamp := c.Query("timestamp")
 		nonce := c.Query("nonce")
-		echostr := c.Query("echostr")
 
 		currentToken, lastToken := srv.GetToken()
 		token := currentToken
-		computedSignature := Sign(token, timestamp, nonce)
-		r := subtle.ConstantTimeCompare([]byte(signature), []byte(computedSignature))
-		if r == 0 {
-			if lastToken == "" {
-				return
-			}
-			token = lastToken
-			computedSignature = Sign(token, timestamp, nonce)
-			r = subtle.ConstantTimeCompare([]byte(signature), []byte(computedSignature))
-			if r == 0 {
-				return
-			}
-		} else {
-			srv.deleteLastToken()
+
+		isValid := func() bool {
+			computedSignature := Sign(token, timestamp, nonce)
+			r := subtle.ConstantTimeCompare([]byte(signature), []byte(computedSignature))
+			return r == 1
 		}
-		c.Text(200, echostr)
+
+		if isValid() {
+			srv.deleteLastToken()
+			return true
+		}
+
+		if lastToken == "" {
+			return false
+		}
+
+		token = lastToken
+		return isValid()
+	}
+
+	srv.Get("/", func(c *mel.Context) {
+		if validateSign(c) {
+			echostr := c.Query("echostr")
+			c.Text(200, echostr)
+		}
 	})
+
+	srv.Post("/", func(c *mel.Context) {
+		encryptType := c.Query("encrypt_type")
+		switch encryptType {
+		case "aes":
+			if !validateSign(c) {
+				return
+			}
+
+			msgSignature := c.Query("msg_signature")
+			timestamp, err := strconv.ParseInt(c.Query("timestamp"), 10, 64)
+			if err != nil {
+				return
+			}
+
+		case "", "raw":
+			if !validateSign(c) {
+				return
+			}
+
+		default:
+			return
+		}
+	})
+
+	return srv
 }
 
 func Sign(token, timestamp, nonce string) string {
