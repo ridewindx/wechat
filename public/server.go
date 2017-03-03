@@ -2,6 +2,7 @@ package public
 
 import (
 	"github.com/ridewindx/mel"
+	"github.com/ridewindx/mel/binding"
 	"sync"
 	"unsafe"
 	"sync/atomic"
@@ -10,12 +11,17 @@ import (
 	"sort"
 	"crypto/sha1"
 	"encoding/hex"
+	"encoding/xml"
 	"crypto/subtle"
 	"strconv"
+    "bufio"
 )
 
 type Server struct {
 	*mel.Mel
+
+	appId string
+	userId string
 
 	tokenMutex sync.Mutex
 	token unsafe.Pointer
@@ -109,7 +115,7 @@ func (srv *Server) SetAESKey(base64AESKey string) {
 	atomic.StorePointer(&srv.aesKey, unsafe.Pointer(&k))
 }
 
-func (srv *Server) deleteAESKey() {
+func (srv *Server) deleteLastAESKey() {
 	srv.aesKeyMutex.Lock()
 	defer srv.aesKeyMutex.Unlock()
 
@@ -129,6 +135,10 @@ func NewServer() *Server {
 		Mel: mel.New(),
 	}
 
+	equal := func(a, b string) bool {
+		return subtle.ConstantTimeCompare([]byte(a), []byte(b)) == 1
+	}
+
 	validateSign := func(c *mel.Context) bool {
 		signature := c.Query("signature")
 		timestamp := c.Query("timestamp")
@@ -139,8 +149,7 @@ func NewServer() *Server {
 
 		isValid := func() bool {
 			computedSignature := Sign(token, timestamp, nonce)
-			r := subtle.ConstantTimeCompare([]byte(signature), []byte(computedSignature))
-			return r == 1
+			return equal(signature, computedSignature)
 		}
 
 		if isValid() {
@@ -156,6 +165,11 @@ func NewServer() *Server {
 		return isValid()
 	}
 
+	type EncryptMsg struct {
+		ToUserName string `xml:",cdata"`
+		Encrypt string `xml:",cdata"`
+	}
+
 	srv.Get("/", func(c *mel.Context) {
 		if validateSign(c) {
 			echostr := c.Query("echostr")
@@ -165,17 +179,61 @@ func NewServer() *Server {
 
 	srv.Post("/", func(c *mel.Context) {
 		encryptType := c.Query("encrypt_type")
+		timestamp := c.Query("timestamp")
+		nonce := c.Query("nonce")
+
 		switch encryptType {
 		case "aes":
 			if !validateSign(c) {
 				return
 			}
 
-			msgSignature := c.Query("msg_signature")
+			msgSign := c.Query("msg_signature")
 			timestamp, err := strconv.ParseInt(c.Query("timestamp"), 10, 64)
 			if err != nil {
 				return
 			}
+
+			var obj EncryptMsg
+			err := c.BindWith(&obj, binding.XML)
+			if err != nil {
+				return
+			}
+
+			if srv.userId != "" && !equal(obj.ToUserName, userId) {
+				return
+			}
+
+			computedSign := MsgSign(token, timestamp, nonce, obj.Encrypt)
+			if !equal(computedSign, msgSign) {
+				return
+			}
+
+			encryptedMsg, err := base64.StdEncoding.DecodeString(obj.Encrypt)
+			if err != nil {
+				return
+			}
+
+			current, last := srv.GetAESKey()
+			aesKey := current
+			random, msg, appId, err := decryptMsg(encryptedMsg, aesKey)
+            if err != nil {
+				if last == "" {
+					return
+				}
+				aesKey = last
+				random, msg, appId, err := decryptMsg(encryptedMsg, aesKey)
+                if err != nil {
+					return
+				}
+			} else {
+				srv.deleteLastAESKey()
+			}
+			if srv.appId != "" && string(appId) != srv.appId {
+				return
+			}
+
+
 
 		case "", "raw":
 			if !validateSign(c) {
@@ -201,4 +259,21 @@ func Sign(token, timestamp, nonce string) string {
 
 	hashsum := sha1.Sum(buf)
 	return hex.EncodeToString(hashsum[:])
+}
+
+func MsgSign(token, timestamp, nonce, encryptedMsg string) string {
+	strs := sort.StringSlice{token, timestamp, nonce, encryptedMsg}
+	strs.Sort()
+
+	h := sha1.New()
+
+	bufw := bufio.NewWriterSize(h, 1024)
+	bufw.WriteString(strs[0])
+	bufw.WriteString(strs[1])
+	bufw.WriteString(strs[2])
+	bufw.WriteString(strs[3])
+	bufw.Flush()
+
+	hashsum := h.Sum(nil)
+	return hex.EncodeToString(hashsum)
 }
