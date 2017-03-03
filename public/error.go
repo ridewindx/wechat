@@ -8,11 +8,27 @@ const (
     AccessTokenExpired = 42001
 )
 
-type Error struct {
-    Code int  `json:"errcode"`
-    Msg  string `json:"errmsg"`
+type Error interface {
+    Code() int
+    Msg() string
 }
 
-func (err *Error) Error() string {
-    return fmt.Sprintf("errcode: %d, errmsg: %s", err.Code, err.Msg)
+var _ Error = &Err{}
+var _ error = &Err{}
+
+type Err struct {
+    ErrCode int  `json:"errcode"`
+    ErrMsg  string `json:"errmsg"`
+}
+
+func (err *Err) Error() string {
+    return fmt.Sprintf("errcode: %d, errmsg: %s", err.ErrCode, err.ErrMsg)
+}
+
+func (err *Err) Code() int {
+    return err.ErrCode
+}
+
+func (err *Err) Msg() string {
+    return err.ErrMsg
 }
