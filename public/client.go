@@ -9,7 +9,7 @@ import (
 	"bytes"
 )
 
-const BASE_URL = "https://api.weixin.qq.com/cgi-bin"
+var BASE_URL URL = "https://api.weixin.qq.com/cgi-bin"
 
 type client struct {
 	*http.Client
@@ -36,7 +36,7 @@ func (c *client) call(u URL, rep interface{}, request func(URL)(*http.Response, 
 	firstTime := true
 
 RETRY:
-	r, err := request(u.Query("access_token", url.QueryEscape(token)))
+	r, err := request(u.Query("access_token", token))
 	if err != nil {
 		return err
 	}
@@ -87,16 +87,16 @@ func (c *client) Post(u URL, req, rep interface{}) error {
 
 type URL string
 
-func (u URL) Join(segment string) string {
+func (u URL) Join(segment string) URL {
 	return u + segment
 }
 
-func (u URL) Query(key, value string) string {
+func (u URL) Query(key, value string) URL {
 	if strings.IndexByte(u, '?') != -1 {
 		u += '&'
 	} else {
 		u += '?'
 	}
-	u += key + '=' + value
+	u += key + '=' + url.QueryEscape(value)
 	return u
 }
