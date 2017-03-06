@@ -149,7 +149,7 @@ func (fb *fileBuf) Close() error {
 	return nil
 }
 
-func (c *client) UploadFile(u URL, name, filePath string, rep interface{}) error {
+func (c *client) UploadFile(u URL, name, filePath string, extraFields map[string]string, rep interface{}) error {
 	var buf fileBuf
 	defer buf.Close()
 
@@ -168,6 +168,13 @@ func (c *client) UploadFile(u URL, name, filePath string, rep interface{}) error
 	if _, err = io.Copy(partWriter, file); err != nil {
 		return err
 	}
+
+	for k, v := range extraFields {
+		if err = mp.WriteField(k, v); err != nil {
+			return
+		}
+	}
+
 	if err = mp.Close(); err != nil {
 		return err
 	}
@@ -192,7 +199,7 @@ func (c *client) DownloadFile(u URL, filePath string, rep interface{}) (err erro
 	}
 
 	defer func() {
-		file.Clode()
+		file.Close()
 		if err != nil {
 			os.Remove(filePath)
 		}
