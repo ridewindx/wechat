@@ -8,9 +8,11 @@ import (
 	"encoding/json"
 	"bytes"
 	"io"
+    "mime"
 	"mime/multipart"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 )
 
 var BASE_URL URL = "https://api.weixin.qq.com/cgi-bin"
@@ -31,7 +33,7 @@ func (c *client) RefreshToken() (string, error) {
 	return "", nil
 }
 
-func (c *client) call(u URL, rep interface{}, request func(URL)(*http.Response, error)) error {
+func (c *client) call(u URL, rep interface{}, streamRep io.Writer, request func(URL)(*http.Response, error)) error {
 	token, err := c.Token()
 	if err != nil {
 		return err
@@ -48,6 +50,15 @@ RETRY:
 
 	if r.StatusCode != http.StatusOK {
 		return errors.New(r.Status)
+	}
+
+	if streamRep != nil {
+		contentDisposition := r.Header.Get("Content-Disposition")
+		contentType, _, _ := mime.ParseMediaType(r.Header.Get("Content-Type"))
+		if contentDisposition != "" && contentType != "text/plain" && contentType != "application/json" {
+			_, err = io.Copy(streamRep, r.Body)
+			return err
+		}
 	}
 
 	err = json.NewDecoder(r.Body).Decode(rep)
@@ -72,7 +83,7 @@ RETRY:
 }
 
 func (c *client) Get(u URL, rep interface{}) error {
-	return c.call(u, rep, func(u URL)(*http.Response, error) {
+	return c.call(u, rep, nil, func(u URL)(*http.Response, error) {
 		return c.Client.Get(u)
 	})
 }
@@ -84,7 +95,7 @@ func (c *client) Post(u URL, req, rep interface{}) error {
 		return err
 	}
 
-	return c.call(u, rep, func(u URL)(*http.Response, error) {
+	return c.call(u, rep, nil, func(u URL)(*http.Response, error) {
 		return c.Client.Post(u, "application/json; charset=utf-8", buf)
 	})
 }
@@ -138,15 +149,22 @@ func (fb *fileBuf) Close() error {
 	return nil
 }
 
-func (c *client) UploadFile(u URL, name, fileName string, file io.Reader, rep interface{}) error {
+func (c *client) UploadFile(u URL, name, filePath string, rep interface{}) error {
 	var buf fileBuf
 	defer buf.Close()
 
 	mp := multipart.NewWriter(buf)
-	partWriter, err := mp.CreateFormFile(name, fileName)
+	partWriter, err := mp.CreateFormFile(name, filepath.Base(filePath))
 	if err != nil {
 		return err
 	}
+
+	file, err := os.Open(filePath)
+	if err != nil {
+		return
+	}
+	defer file.Close()
+
 	if _, err = io.Copy(partWriter, file); err != nil {
 		return err
 	}
@@ -161,9 +179,27 @@ func (c *client) UploadFile(u URL, name, fileName string, file io.Reader, rep in
 		reader = bytes.NewReader(buf.Buffer.Bytes())
 	}
 
-	return c.call(u, rep, func(u URL)(*http.Response, error) {
+	return c.call(u, rep, nil, func(u URL)(*http.Response, error) {
 		reader.Seek(0, 0)
 		return c.Client.Post(u, mp.FormDataContentType, reader)
+	})
+}
+
+func (c *client) DownloadFile(u URL, filePath string, rep interface{}) (err error) {
+	file, err := os.Create(filePath)
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		file.Clode()
+		if err != nil {
+			os.Remove(filePath)
+		}
+	}()
+
+	return c.call(u, rep, file, func(u URL)(*http.Response, error) {
+		return c.Client.Get(u)
 	})
 }
 
