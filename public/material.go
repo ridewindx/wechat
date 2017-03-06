@@ -51,6 +51,24 @@ type MediaCounts struct {
 	NewsCount  int `json:"news_count"`
 }
 
+type NewsList struct {
+	TotalCount int     `json:"total_count"`
+	ItemCount  int     `json:"item_count"` // item count of this time GetNewsList
+	Items []struct{
+		Id         string `json:"media_id"`
+		UpdateTime int64  `json:"update_time"`
+		Content struct{
+					   Articles []Article `json:"news_item,omitempty"`
+				   } `json:"content"`
+	} `json:"item"`
+}
+
+type MediaList struct {
+	TotalCount int     `json:"total_count"`
+	ItemCount  int     `json:"item_count"` // item count of this time GetMediaList
+	Items      []Media `json:"item"`
+}
+
 func (c *client) UploadTempImage(filePath string) (*TempMedia, error) {
 	return c.UploadTempMedia(Image, filePath)
 }
@@ -222,18 +240,6 @@ func (c *client) GetMediaCounts() (mediaCounts *MediaCounts, err error) {
 	return
 }
 
-type NewsList struct {
-	TotalCount int     `json:"total_count"`
-	ItemCount  int     `json:"item_count"` // item count of this time GetNewsList
-	Items []struct{
-		Id         string `json:"media_id"`
-		UpdateTime int64  `json:"update_time"`
-		Content struct{
-			Articles []Article `json:"news_item,omitempty"`
-		} `json:"content"`
-	} `json:"item"`
-}
-
 func (c *client) GetNewsList(offset, count int) (newsList *NewsList, err error) {
 	u := BASE_URL.Join("/material/batchget_material")
 
@@ -264,12 +270,6 @@ func (c *client) GetNewsList(offset, count int) (newsList *NewsList, err error) 
 
 	newsList = &rep.NewsList
 	return
-}
-
-type MediaList struct {
-	TotalCount int     `json:"total_count"`
-	ItemCount  int     `json:"item_count"` // item count of this time GetMediaList
-	Items      []Media `json:"item"`
 }
 
 func (c *client) GetMediaList(mediaType string, offset, count int) (mediaList *MediaList, err error) {
@@ -306,5 +306,20 @@ func (c *client) GetMediaList(mediaType string, offset, count int) (mediaList *M
 	}
 
 	mediaList = &rep.MediaList
+	return
+}
+
+func (c *client) DeleteMedia(mediaId string) (err error) {
+	u := BASE_URL.Join("/material/del_material")
+
+	var req = struct {
+		Id string `json:"media_id"`
+	}{
+		Id: mediaId,
+	}
+
+	var rep Err
+
+	err = c.Post(u, &req, &rep)
 	return
 }
