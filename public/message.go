@@ -21,9 +21,9 @@ type msgHeader struct {
 }
 
 type msgPreviewHeader struct {
-	msgType    string   `json:"msgtype"`
-	toUser    string `json:"touser,omitempty"`
-	wxName     string `json:"towxname,omitempty"`
+	msgType string `json:"msgtype"`
+	toUser  string `json:"touser,omitempty"`
+	wxName  string `json:"towxname,omitempty"`
 }
 
 const (
@@ -80,8 +80,8 @@ func newMsgHeader(msgType string, groupId []int, userIds []string) *msgHeader {
 func newMsgPreviewHeader(msgType, wxName string) *msgPreviewHeader {
 	return &msgPreviewHeader{
 		msgType: msgType,
-		toUser: wxName,
-		wxName: wxName,
+		toUser:  wxName,
+		wxName:  wxName,
 	}
 }
 
@@ -106,8 +106,8 @@ func (c *client) SendTextForPreview(content, wxName string) (id int, err error) 
 	var msg = struct {
 		*msgPreviewHeader
 		Text struct {
-				 Content string `json:"content"`
-			 } `json:"text"`
+			Content string `json:"content"`
+		} `json:"text"`
 	}{
 		msgPreviewHeader: newMsgPreviewHeader(MsgText, wxName),
 		Text: {
@@ -148,8 +148,8 @@ func (c *client) SendImageForPreview(mediaId, wxName string) (id int, err error)
 	var msg = struct {
 		*msgPreviewHeader
 		Image struct {
-				  MediaId string `json:"media_id"`
-			  } `json:"image"`
+			MediaId string `json:"media_id"`
+		} `json:"image"`
 	}{
 		msgPreviewHeader: newMsgPreviewHeader(MsgImage, wxName),
 		Image: {
@@ -190,8 +190,8 @@ func (c *client) SendVoiceForPreview(mediaId, wxName string) (id int, err error)
 	var msg = struct {
 		*msgPreviewHeader
 		Voice struct {
-				  MediaId string `json:"media_id"`
-			  } `json:"voice"`
+			MediaId string `json:"media_id"`
+		} `json:"voice"`
 	}{
 		msgPreviewHeader: newMsgPreviewHeader(MsgVoice, wxName),
 		Voice: {
@@ -232,8 +232,8 @@ func (c *client) SendVideoForPreview(mediaId, wxName string) (id int, err error)
 	var msg = struct {
 		*msgPreviewHeader
 		Video struct {
-				  MediaId string `json:"media_id"`
-			  } `json:"mpvideo"`
+			MediaId string `json:"media_id"`
+		} `json:"mpvideo"`
 	}{
 		msgPreviewHeader: newMsgPreviewHeader(MsgVideo, wxName),
 		Video: {
@@ -274,8 +274,8 @@ func (c *client) SendNewsForPreview(mediaId, wxName string) (id, dataId int, err
 	var msg = struct {
 		*msgPreviewHeader
 		News struct {
-				 MediaId string `json:"media_id"`
-			 } `json:"mpnews"`
+			MediaId string `json:"media_id"`
+		} `json:"mpnews"`
 	}{
 		msgPreviewHeader: newMsgPreviewHeader(MsgNews, wxName),
 		News: {
@@ -318,9 +318,9 @@ func (c *client) SendCardForPreview(cardId, cardExt, wxName string) (id int, err
 	var msg = struct {
 		*msgPreviewHeader
 		Card struct {
-				 Id  string `json:"card_id"`
-				 Ext string `json:"card_ext,omitempty"`
-			 } `json:"wxcard"`
+			Id  string `json:"card_id"`
+			Ext string `json:"card_ext,omitempty"`
+		} `json:"wxcard"`
 	}{
 		msgPreviewHeader: newMsgPreviewHeader(MsgCard, wxName),
 		Card: {
