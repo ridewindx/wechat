@@ -20,12 +20,29 @@ type msgHeader struct {
 	toUsers    []string `json:"touser,omitempty"`
 }
 
-func (c *client) send(msg interface{}, byUsers bool) (id, dataId int, err error) {
+type msgPreviewHeader struct {
+	msgType    string   `json:"msgtype"`
+	toUser    string `json:"touser,omitempty"`
+	wxName     string `json:"towxname,omitempty"`
+}
+
+const (
+	SendAll = iota
+	SendByUsers
+	SendForPreview
+)
+
+func (c *client) send(msg interface{}, sendType int) (id, dataId int, err error) {
 	var u URL
-	if byUsers {
-		u = BASE_URL.Join("/message/mass/send") // send by user ids
-	} else {
+	switch sendType {
+	case SendAll:
 		u = BASE_URL.Join("/message/mass/sendall") // send all, or by group id
+	case SendByUsers:
+		u = BASE_URL.Join("/message/mass/send") // send by user ids
+	case SendForPreview:
+		u = BASE_URL.Join("/message/mass/preview") // send for preview
+	default:
+		panic("invalid sendType")
 	}
 
 	var rep struct {
@@ -60,6 +77,14 @@ func newMsgHeader(msgType string, groupId []int, userIds []string) *msgHeader {
 	}
 }
 
+func newMsgPreviewHeader(msgType, wxName string) *msgPreviewHeader {
+	return &msgPreviewHeader{
+		msgType: msgType,
+		toUser: wxName,
+		wxName: wxName,
+	}
+}
+
 func (c *client) sendText(content string, groupId []int, userIds []string) (id int, err error) {
 	var msg = struct {
 		*msgHeader
@@ -73,7 +98,24 @@ func (c *client) sendText(content string, groupId []int, userIds []string) (id i
 		},
 	}
 
-	id, _, err = c.send(&msg, (userIds != nil))
+	id, _, err = c.send(&msg, int(userIds != nil))
+	return
+}
+
+func (c *client) SendTextForPreview(content, wxName string) (id int, err error) {
+	var msg = struct {
+		*msgPreviewHeader
+		Text struct {
+				 Content string `json:"content"`
+			 } `json:"text"`
+	}{
+		msgPreviewHeader: newMsgPreviewHeader(MsgText, wxName),
+		Text: {
+			Content: content,
+		},
+	}
+
+	id, _, err = c.send(&msg, SendForPreview)
 	return
 }
 
@@ -98,7 +140,24 @@ func (c *client) sendImage(mediaId string, groupId []int, userIds []string) (id 
 		},
 	}
 
-	id, _, err = c.send(&msg, (userIds != nil))
+	id, _, err = c.send(&msg, int(userIds != nil))
+	return
+}
+
+func (c *client) SendImageForPreview(mediaId, wxName string) (id int, err error) {
+	var msg = struct {
+		*msgPreviewHeader
+		Image struct {
+				  MediaId string `json:"media_id"`
+			  } `json:"image"`
+	}{
+		msgPreviewHeader: newMsgPreviewHeader(MsgImage, wxName),
+		Image: {
+			MediaId: mediaId,
+		},
+	}
+
+	id, _, err = c.send(&msg, SendForPreview)
 	return
 }
 
@@ -123,7 +182,24 @@ func (c *client) sendVoice(mediaId string, groupId []int, userIds []string) (id 
 		},
 	}
 
-	id, _, err = c.send(&msg, (userIds != nil))
+	id, _, err = c.send(&msg, int(userIds != nil))
+	return
+}
+
+func (c *client) SendVoiceForPreview(mediaId, wxName string) (id int, err error) {
+	var msg = struct {
+		*msgPreviewHeader
+		Voice struct {
+				  MediaId string `json:"media_id"`
+			  } `json:"voice"`
+	}{
+		msgPreviewHeader: newMsgPreviewHeader(MsgVoice, wxName),
+		Voice: {
+			MediaId: mediaId,
+		},
+	}
+
+	id, _, err = c.send(&msg, SendForPreview)
 	return
 }
 
@@ -148,7 +224,24 @@ func (c *client) sendVideo(mediaId string, groupId []int, userIds []string) (id 
 		},
 	}
 
-	id, _, err = c.send(&msg, (userIds != nil))
+	id, _, err = c.send(&msg, int(userIds != nil))
+	return
+}
+
+func (c *client) SendVideoForPreview(mediaId, wxName string) (id int, err error) {
+	var msg = struct {
+		*msgPreviewHeader
+		Video struct {
+				  MediaId string `json:"media_id"`
+			  } `json:"mpvideo"`
+	}{
+		msgPreviewHeader: newMsgPreviewHeader(MsgVideo, wxName),
+		Video: {
+			MediaId: mediaId,
+		},
+	}
+
+	id, _, err = c.send(&msg, SendForPreview)
 	return
 }
 
@@ -173,7 +266,24 @@ func (c *client) sendNews(mediaId string, groupId []int, userIds []string) (id, 
 		},
 	}
 
-	id, dataId, err = c.send(&msg, (userIds != nil))
+	id, dataId, err = c.send(&msg, int(userIds != nil))
+	return
+}
+
+func (c *client) SendNewsForPreview(mediaId, wxName string) (id, dataId int, err error) {
+	var msg = struct {
+		*msgPreviewHeader
+		News struct {
+				 MediaId string `json:"media_id"`
+			 } `json:"mpnews"`
+	}{
+		msgPreviewHeader: newMsgPreviewHeader(MsgNews, wxName),
+		News: {
+			MediaId: mediaId,
+		},
+	}
+
+	id, dataId, err = c.send(&msg, SendForPreview)
 	return
 }
 
@@ -200,7 +310,26 @@ func (c *client) sendCard(cardId, cardExt string, groupId []int, userIds []strin
 		},
 	}
 
-	id, _, err = c.send(&msg, (userIds != nil))
+	id, _, err = c.send(&msg, int(userIds != nil))
+	return
+}
+
+func (c *client) SendCardForPreview(cardId, cardExt, wxName string) (id int, err error) {
+	var msg = struct {
+		*msgPreviewHeader
+		Card struct {
+				 Id  string `json:"card_id"`
+				 Ext string `json:"card_ext,omitempty"`
+			 } `json:"wxcard"`
+	}{
+		msgPreviewHeader: newMsgPreviewHeader(MsgCard, wxName),
+		Card: {
+			Id:  cardId,
+			Ext: cardExt,
+		},
+	}
+
+	id, _, err = c.send(&msg, SendForPreview)
 	return
 }
 
@@ -210,4 +339,20 @@ func (c *client) SendCardAll(cardId, cardExt string, groupId ...int) (id int, er
 
 func (c *client) SendCardByUsers(cardId, cardExt string, userIds []string) (id int, err error) {
 	return c.sendCard(cardId, cardExt, nil, userIds)
+}
+
+// DeleteMsg deletes the mass message(only MsgNews and MsgVideo) which was sent in half an hour.
+// It invalidates the message content page, but still retains the message card.
+func (c *client) DeleteMsg(msgId string) error {
+	u := BASE_URL.Join("/message/mass/delete")
+
+	var req = struct {
+		Id int64 `json:"msg_id"`
+	}{
+		Id: msgId,
+	}
+
+	var rep Err
+
+	return c.Post(u, &req, &rep)
 }
