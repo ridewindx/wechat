@@ -29,6 +29,12 @@ type Media struct {
 	UpdateTime int64  `json:"update_time"` // only nonempty when call GetMediaList
 }
 
+type Video struct {
+	Title       string `json:"title"`
+	Description string `json:"description"`
+	URL         string `json:"down_url"`
+}
+
 // Article of words and images
 type Article struct {
 	ThumbId          string `json:"thumb_media_id"` // permant media id of cover picture
@@ -38,6 +44,8 @@ type Article struct {
 	Content          string `json:"content"`                      // content, supporting HTML, no JS, less than 20000 chars or 1MB
 	ContentSourceURL string `json:"content_source_url,omitempty"` // URL of "Read the original content"
 	ShowCoverPic     int    `json:"show_cover_pic"`               // whether show cover picture
+	ThumbURL         string `json:"thumb_url"`                    // cover picture URL, only valid for GetNews
+	URL              string `json:"url"`                          // content URL, only valid for GetNews
 }
 
 type News struct {
@@ -52,14 +60,14 @@ type MediaCounts struct {
 }
 
 type NewsList struct {
-	TotalCount int     `json:"total_count"`
-	ItemCount  int     `json:"item_count"` // item count of this time GetNewsList
-	Items []struct{
+	TotalCount int `json:"total_count"`
+	ItemCount  int `json:"item_count"` // item count of this time GetNewsList
+	Items      []struct {
 		Id         string `json:"media_id"`
 		UpdateTime int64  `json:"update_time"`
-		Content struct{
-					   Articles []Article `json:"news_item,omitempty"`
-				   } `json:"content"`
+		Content    struct {
+			Articles []Article `json:"news_item,omitempty"`
+		} `json:"content"`
 	} `json:"item"`
 }
 
@@ -106,7 +114,7 @@ func (c *client) DownloadTempMedia(mediaId, filePath string) error {
 
 	var rep Err
 
-	return c.DownloadFile(u, filePath, &rep)
+	return c.DownloadFile(u, nil, filePath, &rep)
 }
 
 func (c *client) UploadImage(filePath string) (*Media, error) {
@@ -161,6 +169,56 @@ func (c *client) UploadMedia(mediaType, filePath string, extraFields ...map[stri
 	}
 
 	return &rep.Media, err
+}
+
+func (c *client) GetVideo(mediaId string) (video *Video, err error) {
+	u := BASE_URL.Join("/material/get_material")
+
+	var req = struct {
+		Id string `json:"media_id"`
+	}{
+		Id: mediaId,
+	}
+
+	var rep struct {
+		Err
+		Video
+	}
+
+	err = c.Post(u, &req, &rep)
+	if err != nil {
+		return
+	}
+
+	video = &rep.Video
+	return
+}
+
+func (c *client) DownloadVideo(mediaId, filePath string) (err error) {
+	video, err := c.GetVideo(mediaId)
+	if err != nil {
+		return
+	}
+
+	var rep Err
+
+	err = c.DownloadFile(URL(video.URL), nil, filePath, &rep) // TODO: do not need token
+	return
+}
+
+func (c *client) DownloadMedia(mediaId, filePath string) (err error) {
+	u := BASE_URL.Join("/material/get_material")
+
+	var req = struct {
+		Id string `json:"media_id"`
+	}{
+		Id: mediaId,
+	}
+
+	var rep Err
+
+	err = c.DownloadFile(u, &req, filePath, &rep)
+	return
 }
 
 func (c *client) CreateNews(news *News) (mediaId string, err error) {
