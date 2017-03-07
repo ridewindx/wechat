@@ -1,18 +1,18 @@
 package public
 
 import (
-	"net/http"
-	"strings"
-	"net/url"
-	"errors"
-	"encoding/json"
 	"bytes"
+	"encoding/json"
+	"errors"
 	"io"
-    "mime"
-	"mime/multipart"
 	"io/ioutil"
+	"mime"
+	"mime/multipart"
+	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 var BASE_URL URL = "https://api.weixin.qq.com/cgi-bin"
@@ -33,7 +33,7 @@ func (c *client) RefreshToken() (string, error) {
 	return "", nil
 }
 
-func (c *client) call(u URL, rep interface{}, streamRep io.Writer, request func(URL)(*http.Response, error)) error {
+func (c *client) call(u URL, rep interface{}, streamRep io.Writer, request func(URL) (*http.Response, error)) error {
 	token, err := c.Token()
 	if err != nil {
 		return err
@@ -83,7 +83,7 @@ RETRY:
 }
 
 func (c *client) Get(u URL, rep interface{}) error {
-	return c.call(u, rep, nil, func(u URL)(*http.Response, error) {
+	return c.call(u, rep, nil, func(u URL) (*http.Response, error) {
 		return c.Client.Get(u)
 	})
 }
@@ -95,12 +95,12 @@ func (c *client) Post(u URL, req, rep interface{}) error {
 		return err
 	}
 
-	return c.call(u, rep, nil, func(u URL)(*http.Response, error) {
+	return c.call(u, rep, nil, func(u URL) (*http.Response, error) {
 		return c.Client.Post(u, "application/json; charset=utf-8", buf)
 	})
 }
 
-var MaxMemoryForFile = 10*1024*1024
+var MaxMemoryForFile = 10 * 1024 * 1024
 
 type fileBuf struct {
 	bytes.Buffer
@@ -186,13 +186,13 @@ func (c *client) UploadFile(u URL, name, filePath string, extraFields map[string
 		reader = bytes.NewReader(buf.Buffer.Bytes())
 	}
 
-	return c.call(u, rep, nil, func(u URL)(*http.Response, error) {
+	return c.call(u, rep, nil, func(u URL) (*http.Response, error) {
 		reader.Seek(0, 0)
 		return c.Client.Post(u, mp.FormDataContentType, reader)
 	})
 }
 
-func (c *client) DownloadFile(u URL, filePath string, rep interface{}) (err error) {
+func (c *client) DownloadFile(u URL, req interface{}, filePath string, rep interface{}) (err error) {
 	file, err := os.Create(filePath)
 	if err != nil {
 		return err
@@ -205,8 +205,18 @@ func (c *client) DownloadFile(u URL, filePath string, rep interface{}) (err erro
 		}
 	}()
 
-	return c.call(u, rep, file, func(u URL)(*http.Response, error) {
-		return c.Client.Get(u)
+	return c.call(u, rep, file, func(u URL) (*http.Response, error) {
+		if req == nil {
+			return c.Client.Get(u)
+		} else {
+			buf := &bytes.Buffer{}
+			err := json.NewEncoder(buf).Encode(req)
+			if err != nil {
+				return nil, err
+			}
+
+			return c.Client.Post(u, "application/json; charset=utf-8", buf)
+		}
 	})
 }
 
