@@ -13,6 +13,8 @@ type Handler func(*Context)
 type Context struct {
 	*Event
 
+	response interface{}
+
 	index    int8
 	handlers []Handler
 
@@ -29,4 +31,8 @@ func (c *Context) Next() {
 
 func (c *Context) Abort() {
 	c.index = abortIndex
+}
+
+func (c *Context) WriteResponse(rep interface{}) {
+	c.response = rep
 }

@@ -9,7 +9,6 @@ import (
 	"encoding/hex"
 	"encoding/xml"
 	"sort"
-	"strconv"
 	"sync"
 	"sync/atomic"
 	"unsafe"
@@ -160,11 +159,7 @@ func NewServer() *Server {
 		return subtle.ConstantTimeCompare([]byte(a), []byte(b)) == 1
 	}
 
-	validateSign := func(c *mel.Context) bool {
-		signature := c.Query("signature")
-		timestamp := c.Query("timestamp")
-		nonce := c.Query("nonce")
-
+	verifySignReturnToken := func(signature, timestamp, nonce string) string {
 		currentToken, lastToken := srv.GetToken()
 		token := currentToken
 
@@ -175,15 +170,25 @@ func NewServer() *Server {
 
 		if isValid() {
 			srv.deleteLastToken()
-			return true
+			return token
 		}
 
-		if lastToken == "" {
-			return false
+		if lastToken != "" {
+			token = lastToken
+			if isValid() {
+				return token
+			}
 		}
 
-		token = lastToken
-		return isValid()
+		return ""
+	}
+
+	verifySign := func(c *mel.Context) bool {
+		signature := c.Query("signature")
+		timestamp := c.Query("timestamp")
+		nonce := c.Query("nonce")
+
+		return verifySignReturnToken(signature, timestamp, nonce) != ""
 	}
 
 	type EncryptMsg struct {
@@ -192,7 +197,7 @@ func NewServer() *Server {
 	}
 
 	srv.Get("/", func(c *mel.Context) {
-		if validateSign(c) {
+		if verifySign(c) {
 			echostr := c.Query("echostr")
 			c.Text(200, echostr)
 		}
@@ -200,23 +205,21 @@ func NewServer() *Server {
 
 	srv.Post("/", func(c *mel.Context) {
 		encryptType := c.Query("encrypt_type")
+		signature := c.Query("signature")
 		timestamp := c.Query("timestamp")
 		nonce := c.Query("nonce")
 
 		switch encryptType {
 		case "aes":
-			if !validateSign(c) {
+			token := verifySignReturnToken(signature, timestamp, nonce)
+			if token == "" {
 				return
 			}
 
 			msgSign := c.Query("msg_signature")
-			timestamp, err := strconv.ParseInt(c.Query("timestamp"), 10, 64)
-			if err != nil {
-				return
-			}
 
 			var obj EncryptMsg
-			err = c.BindWith(&obj, binding.XML)
+			err := c.BindWith(&obj, binding.XML)
 			if err != nil {
 				return
 			}
@@ -280,8 +283,26 @@ func NewServer() *Server {
 
 			ctx.Next()
 
+			repBytes, err := xml.Marshal(ctx.response)
+			if err != nil {
+				return
+			}
+
+			encryptedRepBytes := encryptMsg(random, repBytes, appId, aesKey)
+			encryptedRepStr := base64.StdEncoding.EncodeToString(encryptedRepBytes)
+			repSignature := computeSign(token, timestamp, nonce, encryptedRepStr)
+
+			type EncryptRepMsg struct {
+				Encrypt    string
+				MsgSignature string
+				TimeStamp string
+				Nonce string
+			}
+
+			c.XML(200, &EncryptRepMsg{encryptedRepStr, repSignature, timestamp, nonce})
+
 		case "", "raw":
-			if !validateSign(c) {
+			if !verifySign(c) {
 				return
 			}
 
