@@ -1,43 +1,43 @@
 package public
 
 import (
-	"github.com/ridewindx/mel"
-	"github.com/ridewindx/mel/binding"
-	"sync"
-	"unsafe"
-	"sync/atomic"
-	"encoding/base64"
+	"bufio"
 	"bytes"
-	"sort"
 	"crypto/sha1"
+	"crypto/subtle"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/xml"
-	"crypto/subtle"
+	"github.com/ridewindx/mel"
+	"github.com/ridewindx/mel/binding"
+	"sort"
 	"strconv"
-    "bufio"
+	"sync"
+	"sync/atomic"
+	"unsafe"
 )
 
 type Server struct {
 	*mel.Mel
 
-	appId string
+	appId  string
 	userId string
 
 	tokenMutex sync.Mutex
-	token unsafe.Pointer
+	token      unsafe.Pointer
 
 	aesKeyMutex sync.Mutex
-	aesKey unsafe.Pointer
+	aesKey      unsafe.Pointer
 }
 
 type Token struct {
 	current string
-	last string
+	last    string
 }
 
 type AESKey struct {
-	current []byte
-	last []byte
+	current string
+	last    string
 }
 
 func (srv *Server) GetToken() (string, string) {
@@ -63,7 +63,7 @@ func (srv *Server) SetToken(token string) {
 
 	t := Token{
 		current: token,
-		last: current,
+		last:    current,
 	}
 	atomic.StorePointer(&srv.token, unsafe.Pointer(&t))
 }
@@ -104,13 +104,13 @@ func (srv *Server) SetAESKey(base64AESKey string) {
 	defer srv.aesKeyMutex.Unlock()
 
 	current, _ := srv.GetAESKey()
-	if bytes.Equal(aesKey, current) {
+	if bytes.Equal(aesKey, []byte(current)) {
 		return
 	}
 
 	k := AESKey{
 		current: aesKey,
-		last: current,
+		last:    current,
 	}
 	atomic.StorePointer(&srv.aesKey, unsafe.Pointer(&k))
 }
@@ -167,7 +167,7 @@ func NewServer() *Server {
 
 	type EncryptMsg struct {
 		ToUserName string `xml:",cdata"`
-		Encrypt string `xml:",cdata"`
+		Encrypt    string `xml:",cdata"`
 	}
 
 	srv.Get("/", func(c *mel.Context) {
@@ -195,7 +195,7 @@ func NewServer() *Server {
 			}
 
 			var obj EncryptMsg
-			err := c.BindWith(&obj, binding.XML)
+			err = c.BindWith(&obj, binding.XML)
 			if err != nil {
 				return
 			}
@@ -216,14 +216,14 @@ func NewServer() *Server {
 
 			current, last := srv.GetAESKey()
 			aesKey := current
-			random, msg, appId, err := decryptMsg(encryptedMsg, aesKey)
-            if err != nil {
+			random, msg, appId, err := decryptMsg(encryptedMsg, []byte(aesKey))
+			if err != nil {
 				if last == "" {
 					return
 				}
 				aesKey = last
-				random, msg, appId, err := decryptMsg(encryptedMsg, aesKey)
-                if err != nil {
+				random, msg, appId, err := decryptMsg(encryptedMsg, []byte(aesKey))
+				if err != nil {
 					return
 				}
 			} else {
@@ -232,8 +232,6 @@ func NewServer() *Server {
 			if srv.appId != "" && string(appId) != srv.appId {
 				return
 			}
-
-
 
 		case "", "raw":
 			if !validateSign(c) {
