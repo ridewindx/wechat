@@ -7,11 +7,11 @@ import (
 )
 
 const (
-	Image = "image"
-	Voice = "voice"
-	Video = "video"
-	Thumb = "thumb"
-	News  = "news"
+	MediaImage = "image"
+	MediaVoice = "voice"
+	MediaVideo = "video"
+	MediaThumb = "thumb"
+	MediaNews  = "news"
 )
 
 // Temporary media
@@ -78,19 +78,19 @@ type MediaList struct {
 }
 
 func (c *client) UploadTempImage(filePath string) (*TempMedia, error) {
-	return c.UploadTempMedia(Image, filePath)
+	return c.UploadTempMedia(MediaImage, filePath)
 }
 
 func (c *client) UploadTempVoice(filePath string) (*TempMedia, error) {
-	return c.UploadTempMedia(Voice, filePath)
+	return c.UploadTempMedia(MediaVoice, filePath)
 }
 
 func (c *client) UploadTempVideo(filePath string) (*TempMedia, error) {
-	return c.UploadTempMedia(Video, filePath)
+	return c.UploadTempMedia(MediaVideo, filePath)
 }
 
 func (c *client) UploadTempThumb(filePath string) (*TempMedia, error) {
-	return c.UploadTempMedia(Thumb, filePath)
+	return c.UploadTempMedia(MediaThumb, filePath)
 }
 
 func (c *client) UploadTempMedia(mediaType, filePath string) (*TempMedia, error) {
@@ -118,15 +118,15 @@ func (c *client) DownloadTempMedia(mediaId, filePath string) error {
 }
 
 func (c *client) UploadImage(filePath string) (*Media, error) {
-	return c.UploadMedia("image", filePath)
+	return c.UploadMedia(MediaImage, filePath)
 }
 
 func (c *client) UploadThumb(filePath string) (*Media, error) {
-	return c.UploadMedia("thumb", filePath)
+	return c.UploadMedia(MediaThumb, filePath)
 }
 
 func (c *client) UploadVoice(filePath string) (*Media, error) {
-	return c.UploadMedia("voice", filePath)
+	return c.UploadMedia(MediaVoice, filePath)
 }
 
 func (c *client) UploadVideo(title, intro, filePath string) (*Media, error) {
@@ -144,10 +144,10 @@ func (c *client) UploadVideo(title, intro, filePath string) (*Media, error) {
 	}
 
 	extraFields := map[string]string{
-		"description": description,
+		"description": string(description),
 	}
 
-	return c.UploadMedia("video", filePath, extraFields)
+	return c.UploadMedia(MediaVideo, filePath, extraFields)
 }
 
 func (c *client) UploadMedia(mediaType, filePath string, extraFields ...map[string]string) (*Media, error) {
@@ -311,7 +311,7 @@ func (c *client) GetNewsList(offset, count int) (newsList *NewsList, err error) 
 		Offset int    `json:"offset"`
 		Count  int    `json:"count"`
 	}{
-		Type:   News,
+		Type:   MediaNews,
 		Offset: offset,
 		Count:  count,
 	}
@@ -333,8 +333,8 @@ func (c *client) GetNewsList(offset, count int) (newsList *NewsList, err error) 
 func (c *client) GetMediaList(mediaType string, offset, count int) (mediaList *MediaList, err error) {
 	u := BASE_URL.Join("/material/batchget_material")
 
-	if mediaType == Video {
-		err = fmt.Errorf("GetMediaList does not support mediaType '%s'", Video)
+	if mediaType == MediaVideo {
+		err = fmt.Errorf("GetMediaList does not support mediaType '%s'", MediaVideo)
 		return
 	}
 
