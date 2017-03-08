@@ -356,3 +356,26 @@ func (c *client) DeleteMsg(msgId string) error {
 
 	return c.Post(u, &req, &rep)
 }
+
+func (c *client) IsMsgSent(msgId string) (bool, error) {
+	u := BASE_URL.Join("/message/mass/get")
+
+	var req = struct {
+		Id int `json:"msg_id"`
+	}{
+		Id: msgId,
+	}
+
+	type rep struct {
+		Err
+		Id  int  `json:"msg_id"`
+		Status string `json:"msg_status"`
+	}
+
+	err := c.Post(u, &req, &rep)
+	if err != nil {
+		return false, err
+	}
+
+	return (rep.Status == "SEND_SUCCESS"), nil
+}
