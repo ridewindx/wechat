@@ -8,13 +8,13 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/xml"
-	"github.com/ridewindx/mel"
-	"github.com/ridewindx/mel/binding"
 	"sort"
 	"strconv"
 	"sync"
 	"sync/atomic"
 	"unsafe"
+	"github.com/ridewindx/mel"
+	"github.com/ridewindx/mel/binding"
 )
 
 type Server struct {
@@ -28,6 +28,10 @@ type Server struct {
 
 	aesKeyMutex sync.Mutex
 	aesKey      unsafe.Pointer
+
+	middlewares []Handler
+	messageHandlerMap map[string]Handler
+	eventHandlerMap map[string]Handler
 }
 
 type Token struct {
@@ -130,9 +134,26 @@ func (srv *Server) deleteLastAESKey() {
 	atomic.StorePointer(&srv.aesKey, unsafe.Pointer(&k))
 }
 
+func (srv *Server) Use(middlewares ...Handler) {
+	srv.middlewares = append(srv.middlewares, middlewares...)
+	if len(srv.middlewares) + 1 > abortIndex {
+		panic("too many middlewares")
+	}
+}
+
+func (srv *Server) HandleMessage(msgType string, handler Handler) {
+	srv.messageHandlerMap[msgType] = handler
+}
+
+func (srv *Server) HandleEvent(eventType string, handler Handler) {
+	srv.eventHandlerMap[eventType] = handler
+}
+
 func NewServer() *Server {
 	srv := &Server{
 		Mel: mel.New(),
+		messageHandlerMap: make(map[string]Handler),
+		eventHandlerMap: make(map[string]Handler),
 	}
 
 	equal := func(a, b string) bool {
@@ -148,7 +169,7 @@ func NewServer() *Server {
 		token := currentToken
 
 		isValid := func() bool {
-			computedSignature := Sign(token, timestamp, nonce)
+			computedSignature := computeSign(token, timestamp, nonce)
 			return equal(signature, computedSignature)
 		}
 
@@ -200,11 +221,11 @@ func NewServer() *Server {
 				return
 			}
 
-			if srv.userId != "" && !equal(obj.ToUserName, userId) {
+			if srv.userId != "" && !equal(obj.ToUserName, srv.userId) {
 				return
 			}
 
-			computedSign := MsgSign(token, timestamp, nonce, obj.Encrypt)
+			computedSign := computeSign(token, timestamp, nonce, obj.Encrypt)
 			if !equal(computedSign, msgSign) {
 				return
 			}
@@ -222,7 +243,7 @@ func NewServer() *Server {
 					return
 				}
 				aesKey = last
-				random, msg, appId, err := decryptMsg(encryptedMsg, []byte(aesKey))
+				random, msg, appId, err = decryptMsg(encryptedMsg, []byte(aesKey))
 				if err != nil {
 					return
 				}
@@ -232,6 +253,32 @@ func NewServer() *Server {
 			if srv.appId != "" && string(appId) != srv.appId {
 				return
 			}
+
+			var event Event
+			if err = xml.Unmarshal(msg, &event); err != nil {
+				return
+			}
+
+			var handler Handler
+			var ok bool
+			if event.Type == MessageEvent {
+				handler, ok = srv.eventHandlerMap[event.Event]
+			} else {
+				handler, ok = srv.messageHandlerMap[event.Type]
+			}
+			if !ok {
+				c.Text(200, "")
+				return
+			}
+
+			ctx := &Context{
+				index: preStartIndex,
+				handlers: append(srv.middlewares, handler),
+				Context: c,
+				Event: event,
+			}
+
+			ctx.Next()
 
 		case "", "raw":
 			if !validateSign(c) {
@@ -246,32 +293,17 @@ func NewServer() *Server {
 	return srv
 }
 
-func Sign(token, timestamp, nonce string) string {
-	strs := sort.StringSlice{token, timestamp, nonce}
-	strs.Sort()
-
-	buf := make([]byte, 0, len(token)+len(timestamp)+len(nonce))
-	buf = append(buf, strs[0]...)
-	buf = append(buf, strs[1]...)
-	buf = append(buf, strs[2]...)
-
-	hashsum := sha1.Sum(buf)
-	return hex.EncodeToString(hashsum[:])
-}
-
-func MsgSign(token, timestamp, nonce, encryptedMsg string) string {
-	strs := sort.StringSlice{token, timestamp, nonce, encryptedMsg}
+func computeSign(elements ...string) string {
+	strs := sort.StringSlice(elements)
 	strs.Sort()
 
 	h := sha1.New()
 
-	bufw := bufio.NewWriterSize(h, 1024)
-	bufw.WriteString(strs[0])
-	bufw.WriteString(strs[1])
-	bufw.WriteString(strs[2])
-	bufw.WriteString(strs[3])
-	bufw.Flush()
+	buf := bufio.NewWriterSize(h, 1024)
+	for _, s := range strs {
+		buf.WriteString(s)
+	}
+	buf.Flush()
 
-	hashsum := h.Sum(nil)
-	return hex.EncodeToString(hashsum)
+	return hex.EncodeToString(h.Sum(nil))
 }

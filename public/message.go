@@ -366,7 +366,7 @@ func (c *client) IsMsgSent(msgId string) (bool, error) {
 		Id: msgId,
 	}
 
-	type rep struct {
+	var rep struct {
 		Err
 		Id  int  `json:"msg_id"`
 		Status string `json:"msg_status"`
