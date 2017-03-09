@@ -106,3 +106,12 @@ type Beacon struct {
 	Minor    int     `xml:"Minor"    json:"Minor"`
 	Distance float64 `xml:"Distance" json:"Distance"`
 }
+
+func responseEventHeader(msgType string, event *Event) *EventHeader {
+	return &EventHeader{
+		ToUser:      event.FromUser,
+		FromUser:    event.ToUser,
+		CreatedTime: event.CreatedTime,
+		Type:        msgType,
+	}
+}
