@@ -67,7 +67,7 @@ func newMsgHeader(msgType string, groupId []int, userIds []string) *msgHeader {
 		if len(groupId) > 0 {
 			f = &msgFilter{false, groupId[0]}
 		} else {
-			f = &msgFilter{true}
+			f = &msgFilter{true, 0}
 		}
 	}
 	return &msgHeader{
@@ -368,7 +368,7 @@ func (c *client) IsMsgSent(msgId string) (bool, error) {
 
 	var rep struct {
 		Err
-		Id  int  `json:"msg_id"`
+		Id     int    `json:"msg_id"`
 		Status string `json:"msg_status"`
 	}
 
@@ -378,4 +378,121 @@ func (c *client) IsMsgSent(msgId string) (bool, error) {
 	}
 
 	return (rep.Status == "SEND_SUCCESS"), nil
+}
+
+func (ctx *Context) ReplyText(content string) {
+	var rep = struct {
+		XMLName struct{} `xml:"xml"`
+		*EventHeader
+		Content string `xml:"Content"`
+	}{
+		EventHeader: responseEventHeader("text", ctx.Event),
+		Content:     content,
+	}
+
+	ctx.WriteResponse(&rep)
+	return
+}
+
+func (ctx *Context) ReplyImage(mediaId string) {
+	var rep = struct {
+		XMLName struct{} `xml:"xml"`
+		*EventHeader
+		Image struct {
+			MediaId string `xml:"MediaId"`
+		} `xml:"Image"`
+	}{
+		EventHeader: responseEventHeader("image", ctx.Event),
+	}
+
+	rep.Image.MediaId = mediaId
+
+	ctx.WriteResponse(&rep)
+	return
+}
+
+func (ctx *Context) ReplyVoice(mediaId string) {
+	var rep = struct {
+		XMLName struct{} `xml:"xml"`
+		*EventHeader
+		Voice struct {
+			MediaId string `xml:"MediaId"`
+		} `xml:"Voice"`
+	}{
+		EventHeader: responseEventHeader("voice", ctx.Event),
+	}
+
+	rep.Voice.MediaId = mediaId
+
+	ctx.WriteResponse(&rep)
+	return
+}
+
+func (ctx *Context) ReplyVideo(mediaId, title, description string) {
+	type Video struct {
+		MediaId     string `xml:"MediaId"`
+		Title       string `xml:"Title"`
+		Description string `xml:"Description"`
+	}
+
+	var rep = struct {
+		XMLName struct{} `xml:"xml"`
+		*EventHeader
+		Video `xml:"Video"`
+	}{
+		EventHeader: responseEventHeader("video", ctx.Event),
+		Video: Video{
+			MediaId:     mediaId,
+			Title:       title,
+			Description: description,
+		},
+	}
+
+	ctx.WriteResponse(&rep)
+	return
+}
+
+type Music struct {
+	Title       string `xml:"Title,omitempty"`
+	Description string `xml:"Description,omitempty"`
+	URL         string `xml:"MusicUrl"`
+	HQURL       string `xml:"HQMusicUrl"`
+	ThumbId     string `xml:"ThumbMediaId"`
+}
+
+func (ctx *Context) ReplyMusic(music *Music) {
+	var rep = struct {
+		XMLName struct{} `xml:"xml"`
+		*EventHeader
+		*Music `xml:"Music"`
+	}{
+		EventHeader: responseEventHeader("music", ctx.Event),
+		Music:       music,
+	}
+
+	ctx.WriteResponse(&rep)
+	return
+}
+
+type ResponseArticle struct {
+	Title       string `xml:"Title"`
+	Description string `xml:"Description"`
+	PicURL      string `xml:"PicUrl"`
+	URL         string `xml:"Url"`
+}
+
+func (ctx *Context) ReplyNews(articles []ResponseArticle) {
+	var rep = struct {
+		XMLName struct{} `xml:"xml"`
+		*EventHeader
+		Count    int               `xml:"ArticleCount"`
+		Articles []ResponseArticle `xml:"Articles>item"`
+	}{
+		EventHeader: responseEventHeader("news", ctx.Event),
+		Count:       len(articles),
+		Articles:    articles,
+	}
+
+	ctx.WriteResponse(&rep)
+	return
 }
