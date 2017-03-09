@@ -1,8 +1,8 @@
 package public
 
 import (
-	"math"
 	"github.com/ridewindx/mel"
+	"math"
 )
 
 const preStartIndex int8 = -1
@@ -17,8 +17,6 @@ type Context struct {
 
 	index    int8
 	handlers []Handler
-
-	*mel.Context
 }
 
 func (c *Context) Next() {
