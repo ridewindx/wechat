@@ -8,12 +8,12 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/xml"
+	"github.com/ridewindx/mel"
+	"github.com/ridewindx/mel/binding"
 	"sort"
 	"sync"
 	"sync/atomic"
 	"unsafe"
-	"github.com/ridewindx/mel"
-	"github.com/ridewindx/mel/binding"
 )
 
 type Server struct {
@@ -28,9 +28,9 @@ type Server struct {
 	aesKeyMutex sync.Mutex
 	aesKey      unsafe.Pointer
 
-	middlewares []Handler
+	middlewares       []Handler
 	messageHandlerMap map[string]Handler
-	eventHandlerMap map[string]Handler
+	eventHandlerMap   map[string]Handler
 }
 
 type Token struct {
@@ -112,7 +112,7 @@ func (srv *Server) SetAESKey(base64AESKey string) {
 	}
 
 	k := AESKey{
-		current: aesKey,
+		current: string(aesKey),
 		last:    current,
 	}
 	atomic.StorePointer(&srv.aesKey, unsafe.Pointer(&k))
@@ -135,7 +135,7 @@ func (srv *Server) deleteLastAESKey() {
 
 func (srv *Server) Use(middlewares ...Handler) {
 	srv.middlewares = append(srv.middlewares, middlewares...)
-	if len(srv.middlewares) + 1 > abortIndex {
+	if len(srv.middlewares)+1 > int(abortIndex) {
 		panic("too many middlewares")
 	}
 }
@@ -150,9 +150,9 @@ func (srv *Server) HandleEvent(eventType string, handler Handler) {
 
 func NewServer() *Server {
 	srv := &Server{
-		Mel: mel.New(),
+		Mel:               mel.New(),
 		messageHandlerMap: make(map[string]Handler),
-		eventHandlerMap: make(map[string]Handler),
+		eventHandlerMap:   make(map[string]Handler),
 	}
 
 	equal := func(a, b string) bool {
@@ -202,6 +202,29 @@ func NewServer() *Server {
 			c.Text(200, echostr)
 		}
 	})
+
+	handleMessage := func(event *Event) interface{} {
+		var handler Handler
+		var ok bool
+		if event.Type == MessageEvent {
+			handler, ok = srv.eventHandlerMap[event.Event]
+		} else {
+			handler, ok = srv.messageHandlerMap[event.Type]
+		}
+		if !ok {
+			return nil // no registered handler, just respond with empty string
+		}
+
+		ctx := &Context{
+			index:    preStartIndex,
+			handlers: append(srv.middlewares, handler),
+			Event:    event,
+		}
+
+		ctx.Next()
+
+		return ctx.response
+	}
 
 	srv.Post("/", func(c *mel.Context) {
 		encryptType := c.Query("encrypt_type")
@@ -262,41 +285,20 @@ func NewServer() *Server {
 				return
 			}
 
-			var handler Handler
-			var ok bool
-			if event.Type == MessageEvent {
-				handler, ok = srv.eventHandlerMap[event.Event]
-			} else {
-				handler, ok = srv.messageHandlerMap[event.Type]
-			}
-			if !ok {
-				c.Text(200, "")
-				return
-			}
-
-			ctx := &Context{
-				index: preStartIndex,
-				handlers: append(srv.middlewares, handler),
-				Context: c,
-				Event: event,
-			}
-
-			ctx.Next()
-
-			repBytes, err := xml.Marshal(ctx.response)
+			repBytes, err := xml.Marshal(handleMessage(&event))
 			if err != nil {
 				return
 			}
 
-			encryptedRepBytes := encryptMsg(random, repBytes, appId, aesKey)
+			encryptedRepBytes := encryptMsg(random, repBytes, appId, []byte(aesKey))
 			encryptedRepStr := base64.StdEncoding.EncodeToString(encryptedRepBytes)
 			repSignature := computeSign(token, timestamp, nonce, encryptedRepStr)
 
 			type EncryptRepMsg struct {
-				Encrypt    string
+				Encrypt      string
 				MsgSignature string
-				TimeStamp string
-				Nonce string
+				TimeStamp    string
+				Nonce        string
 			}
 
 			c.XML(200, &EncryptRepMsg{encryptedRepStr, repSignature, timestamp, nonce})
@@ -305,6 +307,14 @@ func NewServer() *Server {
 			if !verifySign(c) {
 				return
 			}
+
+			var event Event
+			err := c.BindWith(&event, binding.XML)
+			if err != nil {
+				return
+			}
+
+			c.XML(200, handleMessage(&event))
 
 		default:
 			return
