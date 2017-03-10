@@ -3,6 +3,7 @@ package public
 import (
 	"crypto/md5"
 	"encoding/hex"
+	"time"
 )
 
 func (ctx *Context) ReplyTransferToAgent(agentAccount ...string) {
@@ -212,5 +213,83 @@ func (c *client) GetWaitingAgentSessions() (totalCount int, sessions []AgentSess
 
 	totalCount = rep.TotalCount
 	sessions = rep.Sessions
+	return
+}
+
+const (
+	OpCreateSession = 1000
+	OpAcceptSession = 1001
+	OpInitiateSession = 1002
+	OpTransferSession = 1003
+	OpCloseSession = 1004
+	OpRobSession = 1005
+	OpBackendRecvMessage = 2001
+	OpAgentSendMessage = 2002
+	OpAgentRecvMessage = 2003
+)
+
+type TimeSpan struct {
+	StartTime int64  `json:"starttime"` // UNIX timestamp
+	EndTime   int64  `json:"endtime"` // UNIX timestamp; EndTime-StartTime <= 24 hours
+}
+
+func NewTimeSpanAfter(start time.Time, duration time.Duration) *TimeSpan {
+	var ts TimeSpan
+	ts.StartTime = start.Unix()
+	ts.EndTime = start.Add(duration).Unix()
+	return &ts
+}
+
+func NewTimeSpanBefore(end time.Time, duration time.Duration) *TimeSpan {
+	var ts TimeSpan
+	ts.StartTime = end.Add(-duration).Unix()
+	ts.EndTime = end.Unix()
+	return &ts
+}
+
+type MsgRecord struct {
+	Agent    string `json:"worker"` // agent account
+	OpenId    string `json:"openid"`
+	OpCode  int    `json:"opercode"`
+	Timestamp int64  `json:"time"` // UNIX timestamp
+	Text      string `json:"text"` // message text
+}
+
+func (c *client) GetAgentMsgRecords(timeSpan *TimeSpan, pageIndex int, pageSize ...int) (records []MsgRecord, err error) {
+	u := BASE_URL.Join("/customservice/msgrecord/getrecord")
+
+	if pageIndex < 1 {
+		panic("invalid page index")
+	}
+
+	var size = 50
+	if len(pageSize) > 0 {
+		size = pageSize[0]
+		if size < 1 || size > 50 {
+			panic("invalid page size")
+		}
+	}
+
+	var req = struct {
+		TimeSpan
+		PageIndex int    `json:"pageindex"` // base 1
+		PageSize  int    `json:"pagesize"` // limit 50
+	}{
+		TimeSpan: timeSpan,
+		PageIndex: pageIndex,
+		PageSize: size,
+	}
+
+	var rep struct{
+		Err
+		Records []MsgRecord `json:"recordlist"`
+	}
+
+	err = c.Post(u, &req, &rep)
+	if err != nil {
+		return
+	}
+
+	records = rep.Records
 	return
 }
