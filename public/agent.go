@@ -217,20 +217,20 @@ func (c *client) GetWaitingAgentSessions() (totalCount int, sessions []AgentSess
 }
 
 const (
-	OpCreateSession = 1000
-	OpAcceptSession = 1001
-	OpInitiateSession = 1002
-	OpTransferSession = 1003
-	OpCloseSession = 1004
-	OpRobSession = 1005
+	OpCreateSession      = 1000
+	OpAcceptSession      = 1001
+	OpInitiateSession    = 1002
+	OpSwitchSession      = 1003
+	OpCloseSession       = 1004
+	OpRobSession         = 1005
 	OpBackendRecvMessage = 2001
-	OpAgentSendMessage = 2002
-	OpAgentRecvMessage = 2003
+	OpAgentSendMessage   = 2002
+	OpAgentRecvMessage   = 2003
 )
 
 type TimeSpan struct {
-	StartTime int64  `json:"starttime"` // UNIX timestamp
-	EndTime   int64  `json:"endtime"` // UNIX timestamp; EndTime-StartTime <= 24 hours
+	StartTime int64 `json:"starttime"` // UNIX timestamp
+	EndTime   int64 `json:"endtime"`   // UNIX timestamp; EndTime-StartTime <= 24 hours
 }
 
 func NewTimeSpanAfter(start time.Time, duration time.Duration) *TimeSpan {
@@ -248,9 +248,9 @@ func NewTimeSpanBefore(end time.Time, duration time.Duration) *TimeSpan {
 }
 
 type MsgRecord struct {
-	Agent    string `json:"worker"` // agent account
+	Agent     string `json:"worker"` // agent account
 	OpenId    string `json:"openid"`
-	OpCode  int    `json:"opercode"`
+	OpCode    int    `json:"opercode"`
 	Timestamp int64  `json:"time"` // UNIX timestamp
 	Text      string `json:"text"` // message text
 }
@@ -272,15 +272,15 @@ func (c *client) GetAgentMsgRecords(timeSpan *TimeSpan, pageIndex int, pageSize 
 
 	var req = struct {
 		TimeSpan
-		PageIndex int    `json:"pageindex"` // base 1
-		PageSize  int    `json:"pagesize"` // limit 50
+		PageIndex int `json:"pageindex"` // base 1
+		PageSize  int `json:"pagesize"`  // limit 50
 	}{
-		TimeSpan: timeSpan,
+		TimeSpan:  timeSpan,
 		PageIndex: pageIndex,
-		PageSize: size,
+		PageSize:  size,
 	}
 
-	var rep struct{
+	var rep struct {
 		Err
 		Records []MsgRecord `json:"recordlist"`
 	}
