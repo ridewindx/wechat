@@ -99,8 +99,16 @@ type Event struct {
 
 	Status string `xml:"Status" json:"Status"`
 
+	*AgentSessionChange
+
 	ChosenBeacon  *Beacon `xml:"ChosenBeacon,omitempty" json:"ChosenBeacon,omitempty"`
 	AroundBeacons *Beacon `xml:"AroundBeacons>AroundBeacon,omitempty" json:"AroundBeacons,omitempty"`
+}
+
+type AgentSessionChange struct {
+	Account     string `xml:"KfAccount"     json:"KfAccount"`
+	FromAccount string `xml:"FromKfAccount" json:"FromKfAccount"`
+	ToAccount   string `xml:"ToKfAccount"   json:"ToKfAccount"`
 }
 
 type Beacon struct {
