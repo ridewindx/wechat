@@ -3,7 +3,7 @@ package public
 import (
 	"errors"
 	"fmt"
-	"github.com/chanxuehong/wechat.v2/json"
+	"encoding/json"
 	"math"
 	"net/http"
 	"net/url"

@@ -1,0 +1,250 @@
+package mch
+
+import (
+	"net/http"
+	"time"
+	"crypto/md5"
+	"crypto/hmac"
+	"fmt"
+	"crypto/sha256"
+	"bytes"
+	"sync"
+	"strings"
+	"io"
+	"crypto/tls"
+)
+
+const API_URL = "https://api.mch.weixin.qq.com"
+
+type Client struct {
+	appID  string
+	mchID  string
+	apiKey string
+
+	subAppID string
+	subMchID string
+
+	signType string // 签名类型，目前支持HMAC-SHA256和MD5，默认为MD5
+
+	client    *http.Client
+	tlsClient *http.Client
+}
+
+func New(appID, mchID, apiKey string, timeout ...time.Duration) *Client {
+	client := &Client{
+		appID:  appID,
+		mchID:  mchID,
+		apiKey: apiKey,
+	}
+	if len(timeout) > 0 {
+		client.client = &http.Client{
+			Timeout: timeout[0],
+		}
+	}
+	return client
+}
+
+func NewWithSubMch(appID, mchID, apiKey, subAppID, subMchID string, timeout ...time.Duration) *Client {
+	client := &Client{
+		appID:    appID,
+		mchID:    mchID,
+		apiKey:   apiKey,
+		subAppID: subAppID,
+		subMchID: subMchID,
+	}
+	if len(timeout) > 0 {
+		client.client = &http.Client{
+			Timeout: timeout[0],
+		}
+	}
+	return client
+}
+
+func (client *Client) SetCert(certFile, keyFile string) error {
+	cert, err := tls.LoadX509KeyPair(certFile, keyFile)
+	if err != nil {
+		return err
+	}
+	tlsConfig := &tls.Config{
+		Certificates: []tls.Certificate{cert},
+	}
+
+	transport := *http.DefaultTransport.(*http.Transport)
+	transport.TLSClientConfig = tlsConfig
+	client.tlsClient = &http.Client{
+		Transport: &transport,
+		Timeout:   client.client.Timeout,
+	}
+	return nil
+}
+
+func (client *Client) SetSignType(signType string) error {
+	if signType != SignTypeHMAC_SHA256 && signType != SignTypeMD5 {
+		return fmt.Errorf("unsupported sign type: %s", signType)
+	}
+	client.signType = signType
+	return nil
+}
+
+var pool = sync.Pool{
+	New: func() interface{} {
+		return bytes.NewBuffer(make([]byte, 0, 4<<10)) // 4KB
+	},
+}
+
+func (client *Client) PostXML(relativeURL string, req map[string]string) (rep map[string]string, err error) {
+	return client.postXML(false, relativeURL, req)
+}
+
+func (client *Client) PostXMLWithCert(relativeURL string, req map[string]string) (rep map[string]string, err error) {
+	return client.postXML(true, relativeURL, req)
+}
+
+func (client *Client) postXML(withCert bool, relativeURL string, req map[string]string) (rep map[string]string, err error) {
+	buffer, err := client.makeRequest(req)
+	defer pool.Put(buffer)
+	if err != nil {
+		return nil, err
+	}
+
+	url := API_URL + relativeURL
+	rep, err = client.postToMap(withCert, url, buffer)
+	if err != nil {
+		bizError, ok := err.(*BizError)
+		if !ok || bizError.ErrCode != ErrCodeSYSTEMERROR {
+			return
+		}
+		url = switchReqURL(url)
+		return client.postToMap(withCert, url, buffer) // retry
+	}
+	return
+}
+
+func (client *Client) makeRequest(req map[string]string) (*bytes.Buffer, error) {
+	req["appid"] = client.appID
+	req["mch_id"] = client.mchID
+	if client.subAppID != "" {
+		req["sub_appid"] = client.subAppID
+	}
+	if client.subMchID != "" {
+		req["sub_mch_id"] = client.subMchID
+	}
+
+	req["nonce_str"] = RandString(32)
+
+	switch client.signType {
+	case "", SignTypeMD5:
+		req["sign_type"] = SignTypeMD5
+		req["sign"] = Sign(req, client.apiKey, md5.New())
+	case SignTypeHMAC_SHA256:
+		req["sign_type"] = SignTypeHMAC_SHA256
+		req["sign"] = Sign(req, client.apiKey, hmac.New(sha256.New, []byte(client.apiKey)))
+	}
+
+	buffer := pool.Get().(*bytes.Buffer)
+	buffer.Reset()
+
+	err := EncodeXML(buffer, req)
+	return buffer, err
+}
+
+func (client *Client) postToMap(withCert bool, url string, body io.Reader) (rep map[string]string, err error) {
+	repBody, err := client.post(withCert, url, body)
+	if err != nil {
+		return nil, err
+	}
+	defer repBody.Close()
+	return client.toMap(repBody)
+}
+
+func (client *Client) post(withCert bool, url string, body io.Reader) (io.ReadCloser, error) {
+	c := client.client
+	if withCert {
+		c = client.tlsClient
+	}
+	rep, err := c.Post(url, "text/xml; charset=utf-8", body)
+	if err != nil {
+		return nil, err
+	}
+	if rep.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("http status: %s", rep.Status)
+	}
+
+	return rep.Body, nil
+}
+
+func (client *Client) toMap(repBody io.Reader) (rep map[string]string, err error) {
+	if closer, ok := repBody.(io.Closer); ok {
+		defer closer.Close()
+	}
+
+	rep, err = DecodeXML(repBody)
+	if err != nil {
+		return nil, err
+	}
+
+	returnCode := rep["return_code"]
+	if returnCode != ReturnCodeSuccess {
+		return nil, &Error{
+			ReturnCode: returnCode,
+			ReturnMsg:  rep["return_msg"],
+		}
+	}
+
+	appId := rep["appid"]
+	if appId != client.appID {
+		return nil, fmt.Errorf("appid mismatch, have: %s, want: %s", appId, client.appID)
+	}
+	mchId := rep["mch_id"]
+	if mchId != client.mchID {
+		return nil, fmt.Errorf("mch_id mismatch, have: %s, want: %s", mchId, client.mchID)
+	}
+
+	if client.subAppID != "" {
+		subAppId := rep["sub_appid"]
+		subMchId := rep["sub_mch_id"]
+		if subAppId != "" && subAppId != client.subAppID {
+			return nil, fmt.Errorf("sub_appid mismatch, have: %s, want: %s", subAppId, client.subAppID)
+		}
+		if subMchId != client.subMchID {
+			return nil, fmt.Errorf("sub_mch_id mismatch, have: %s, want: %s", subMchId, client.subMchID)
+		}
+	}
+
+	var signWant string
+	signHave := rep["sign"]
+	repSignType := rep["sign_type"]
+	switch repSignType {
+	case "", SignTypeMD5:
+		signWant = Sign(rep, client.apiKey, md5.New())
+	case SignTypeHMAC_SHA256:
+		signWant = Sign(rep, client.apiKey, hmac.New(sha256.New, []byte(client.apiKey)))
+	default:
+		err = fmt.Errorf("unsupported response sign_type: %s", repSignType)
+		return nil, err
+	}
+	if signHave != signWant {
+		return nil, fmt.Errorf("sign mismatch,\nhave: %s,\nwant: %s", signHave, signWant)
+	}
+
+	resultCode := rep["result_code"]
+	if resultCode != ResultCodeSuccess {
+		return nil, &BizError{
+			ResultCode:  resultCode,
+			ErrCode:     rep["err_code"],
+			ErrCodeDesc: rep["err_code_des"],
+		}
+	}
+	return rep, nil
+}
+
+func switchReqURL(url string) string {
+	switch {
+	case strings.HasPrefix(url, "https://api.mch.weixin.qq.com/"):
+		return "https://api2.mch.weixin.qq.com/" + url[len("https://api.mch.weixin.qq.com/"):]
+	case strings.HasPrefix(url, "https://api2.mch.weixin.qq.com/"):
+		return "https://api.mch.weixin.qq.com/" + url[len("https://api2.mch.weixin.qq.com/"):]
+	default:
+		return url
+	}
+}
