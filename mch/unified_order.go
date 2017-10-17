@@ -13,7 +13,7 @@ type UnifiedOrderRequest struct {
 	TotalFee       int  // 订单总金额，单位为分，详见支付金额
 	SpbillCreateIP string // APP和网页支付提交用户端ip，Native支付填调用微信支付API的机器IP。
 	NotifyURL      string // 接收微信支付异步通知回调地址，通知url必须为直接可访问的url，不能携带参数。
-	TradeType      string // 取值如下：JSAPI，NATIVE，APP，详细说明见参数规定
+	TradeType      TradeType // 取值如下：JSAPI，NATIVE，APP，详细说明见参数规定
 
 	// 可选参数
 	DeviceInfo string // 终端设备号(门店号或收银设备ID)，注意：PC网页或公众号内支付请传"WEB"
@@ -47,7 +47,7 @@ func (client *Client) UnifiedOrder(req *UnifiedOrderRequest) (rep *UnifiedOrderR
 	reqMap["total_fee"] = strconv.Itoa(req.TotalFee)
 	reqMap["spbill_create_ip"] = req.SpbillCreateIP
 	reqMap["notify_url"] = req.NotifyURL
-	reqMap["trade_type"] = req.TradeType
+	reqMap["trade_type"] = string(req.TradeType)
 	if req.DeviceInfo != "" {
 		reqMap["device_info"] = req.DeviceInfo
 	}
@@ -91,7 +91,7 @@ func (client *Client) UnifiedOrder(req *UnifiedOrderRequest) (rep *UnifiedOrderR
 	}
 
 	repTradeType := repMap["trade_type"]
-	if repTradeType != req.TradeType {
+	if repTradeType != string(req.TradeType) {
 		err = fmt.Errorf("trade_type mismatch, have: %s, want: %s", repTradeType, req.TradeType)
 		return nil, err
 	}

@@ -60,11 +60,23 @@ func NewWithSubMch(appID, mchID, apiKey, subAppID, subMchID string, timeout ...t
 	return client
 }
 
-func (client *Client) SetCert(certFile, keyFile string) error {
+func (client *Client) SetCert(certPEMBlock, keyPEMBlock []byte) error {
+	cert, err := tls.X509KeyPair(certPEMBlock, keyPEMBlock)
+	if err != nil {
+		return err
+	}
+	return client.setCert(cert)
+}
+
+func (client *Client) SetCertFromFile(certFile, keyFile string) error {
 	cert, err := tls.LoadX509KeyPair(certFile, keyFile)
 	if err != nil {
 		return err
 	}
+	return client.setCert(cert)
+}
+
+func (client *Client) setCert(cert tls.Certificate) error {
 	tlsConfig := &tls.Config{
 		Certificates: []tls.Certificate{cert},
 	}
