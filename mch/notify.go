@@ -8,6 +8,7 @@ import (
 	"crypto/sha256"
 	"go.uber.org/zap"
 	"github.com/jiudaoyun/wechat"
+	"io"
 )
 
 type NotifyMsg struct {
@@ -32,9 +33,13 @@ type NotifyHandler struct {
 	*zap.SugaredLogger
 }
 
-func NewNotifyHandler(appID, mchID, apiKey string, handler func(*NotifyMsg) error) *NotifyHandler {
+func NewNotifyHandler(appID, mchID, apiKey string, handler ...func(*NotifyMsg) error) *NotifyHandler {
+	var h func(*NotifyMsg) error
+	if len(handler) > 0 {
+		h = handler[0]
+	}
 	return &NotifyHandler{
-		handler: handler,
+		handler: h,
 
 		appID:  appID,
 		mchID:  mchID,
@@ -44,7 +49,7 @@ func NewNotifyHandler(appID, mchID, apiKey string, handler func(*NotifyMsg) erro
 	}
 }
 
-func (nm *NotifyHandler) serveError(w http.ResponseWriter, reason string) {
+func (nm *NotifyHandler) serveError(w io.Writer, reason string) {
 	nm.Errorw("NotifyHandler serve error", "error", reason)
 	err := EncodeXML(w, map[string]string{
 		"return_code": ReturnCodeFail,
@@ -56,6 +61,10 @@ func (nm *NotifyHandler) serveError(w http.ResponseWriter, reason string) {
 }
 
 func (nm *NotifyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	nm.Serve(w, r, nm.handler)
+}
+
+func (nm *NotifyHandler) Serve(w io.Writer, r *http.Request, handler func(*NotifyMsg) error) {
 	if r.Method != "POST" {
 		nm.serveError(w, "unexpected HTTP Method: "+r.Method)
 		return
@@ -150,7 +159,7 @@ func (nm *NotifyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		SubMchID: req["sub_mch_id"],
 		OrderInfo: *orderInfo,
 	}
-	err = nm.handler(&msg)
+	err = handler(&msg)
 	if err != nil {
 		nm.serveError(w, err.Error())
 	}
