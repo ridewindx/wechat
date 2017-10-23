@@ -77,23 +77,23 @@ type MediaList struct {
 	Items      []Media `json:"item"`
 }
 
-func (c *client) UploadTempImage(filePath string) (*TempMedia, error) {
+func (c *Client) UploadTempImage(filePath string) (*TempMedia, error) {
 	return c.UploadTempMedia(MediaImage, filePath)
 }
 
-func (c *client) UploadTempVoice(filePath string) (*TempMedia, error) {
+func (c *Client) UploadTempVoice(filePath string) (*TempMedia, error) {
 	return c.UploadTempMedia(MediaVoice, filePath)
 }
 
-func (c *client) UploadTempVideo(filePath string) (*TempMedia, error) {
+func (c *Client) UploadTempVideo(filePath string) (*TempMedia, error) {
 	return c.UploadTempMedia(MediaVideo, filePath)
 }
 
-func (c *client) UploadTempThumb(filePath string) (*TempMedia, error) {
+func (c *Client) UploadTempThumb(filePath string) (*TempMedia, error) {
 	return c.UploadTempMedia(MediaThumb, filePath)
 }
 
-func (c *client) UploadTempMedia(mediaType, filePath string) (*TempMedia, error) {
+func (c *Client) UploadTempMedia(mediaType, filePath string) (*TempMedia, error) {
 	u := BASE_URL.Join("/media/upload").Query("type", mediaType)
 
 	var rep struct {
@@ -109,7 +109,7 @@ func (c *client) UploadTempMedia(mediaType, filePath string) (*TempMedia, error)
 	return &rep.TempMedia, err
 }
 
-func (c *client) DownloadTempMedia(mediaId, filePath string) error {
+func (c *Client) DownloadTempMedia(mediaId, filePath string) error {
 	u := BASE_URL.Join("/media/get").Query("media_id", mediaId) // TODO: download video needs http, not https
 
 	var rep Err
@@ -117,19 +117,19 @@ func (c *client) DownloadTempMedia(mediaId, filePath string) error {
 	return c.DownloadFile(u, nil, filePath, &rep)
 }
 
-func (c *client) UploadImage(filePath string) (*Media, error) {
+func (c *Client) UploadImage(filePath string) (*Media, error) {
 	return c.UploadMedia(MediaImage, filePath)
 }
 
-func (c *client) UploadThumb(filePath string) (*Media, error) {
+func (c *Client) UploadThumb(filePath string) (*Media, error) {
 	return c.UploadMedia(MediaThumb, filePath)
 }
 
-func (c *client) UploadVoice(filePath string) (*Media, error) {
+func (c *Client) UploadVoice(filePath string) (*Media, error) {
 	return c.UploadMedia(MediaVoice, filePath)
 }
 
-func (c *client) UploadVideo(title, intro, filePath string) (*Media, error) {
+func (c *Client) UploadVideo(title, intro, filePath string) (*Media, error) {
 	var descr = struct {
 		Title string `json:"title"`
 		Intro string `json:"introduction"`
@@ -150,7 +150,7 @@ func (c *client) UploadVideo(title, intro, filePath string) (*Media, error) {
 	return c.UploadMedia(MediaVideo, filePath, extraFields)
 }
 
-func (c *client) UploadMedia(mediaType, filePath string, extraFields ...map[string]string) (*Media, error) {
+func (c *Client) UploadMedia(mediaType, filePath string, extraFields ...map[string]string) (*Media, error) {
 	u := BASE_URL.Join("/material/add_material").Query("type", mediaType)
 
 	var rep struct {
@@ -171,7 +171,7 @@ func (c *client) UploadMedia(mediaType, filePath string, extraFields ...map[stri
 	return &rep.Media, err
 }
 
-func (c *client) GetVideo(mediaId string) (video *Video, err error) {
+func (c *Client) GetVideo(mediaId string) (video *Video, err error) {
 	u := BASE_URL.Join("/material/get_material")
 
 	var req = struct {
@@ -194,7 +194,7 @@ func (c *client) GetVideo(mediaId string) (video *Video, err error) {
 	return
 }
 
-func (c *client) DownloadVideo(mediaId, filePath string) (err error) {
+func (c *Client) DownloadVideo(mediaId, filePath string) (err error) {
 	video, err := c.GetVideo(mediaId)
 	if err != nil {
 		return
@@ -206,7 +206,7 @@ func (c *client) DownloadVideo(mediaId, filePath string) (err error) {
 	return
 }
 
-func (c *client) DownloadMedia(mediaId, filePath string) (err error) {
+func (c *Client) DownloadMedia(mediaId, filePath string) (err error) {
 	u := BASE_URL.Join("/material/get_material")
 
 	var req = struct {
@@ -221,7 +221,7 @@ func (c *client) DownloadMedia(mediaId, filePath string) (err error) {
 	return
 }
 
-func (c *client) CreateNews(news *News) (mediaId string, err error) {
+func (c *Client) CreateNews(news *News) (mediaId string, err error) {
 	u := BASE_URL.Join("/material/add_news")
 
 	var rep struct {
@@ -238,7 +238,7 @@ func (c *client) CreateNews(news *News) (mediaId string, err error) {
 	return
 }
 
-func (c *client) GetNews(mediaId string) (news *News, err error) {
+func (c *Client) GetNews(mediaId string) (news *News, err error) {
 	u := BASE_URL.Join("/material/get_material")
 
 	var req struct {
@@ -262,7 +262,7 @@ func (c *client) GetNews(mediaId string) (news *News, err error) {
 }
 
 // UpdateNews updates the index-th(0 based) article in the news which has media id mediaId.
-func (c *client) UpdateNews(mediaId string, index int, article *Article) (err error) {
+func (c *Client) UpdateNews(mediaId string, index int, article *Article) (err error) {
 	u := BASE_URL.Join("/material/update_news")
 
 	var req = struct {
@@ -281,7 +281,7 @@ func (c *client) UpdateNews(mediaId string, index int, article *Article) (err er
 	return
 }
 
-func (c *client) GetMediaCounts() (mediaCounts *MediaCounts, err error) {
+func (c *Client) GetMediaCounts() (mediaCounts *MediaCounts, err error) {
 	u := BASE_URL.Join("/material/get_materialcount")
 
 	var rep struct {
@@ -298,7 +298,7 @@ func (c *client) GetMediaCounts() (mediaCounts *MediaCounts, err error) {
 	return
 }
 
-func (c *client) GetNewsList(offset, count int) (newsList *NewsList, err error) {
+func (c *Client) GetNewsList(offset, count int) (newsList *NewsList, err error) {
 	u := BASE_URL.Join("/material/batchget_material")
 
 	if count < 1 || count > 20 {
@@ -330,7 +330,7 @@ func (c *client) GetNewsList(offset, count int) (newsList *NewsList, err error) 
 	return
 }
 
-func (c *client) GetMediaList(mediaType string, offset, count int) (mediaList *MediaList, err error) {
+func (c *Client) GetMediaList(mediaType string, offset, count int) (mediaList *MediaList, err error) {
 	u := BASE_URL.Join("/material/batchget_material")
 
 	if mediaType == MediaVideo {
@@ -367,7 +367,7 @@ func (c *client) GetMediaList(mediaType string, offset, count int) (mediaList *M
 	return
 }
 
-func (c *client) DeleteMedia(mediaId string) (err error) {
+func (c *Client) DeleteMedia(mediaId string) (err error) {
 	u := BASE_URL.Join("/material/del_material")
 
 	var req = struct {

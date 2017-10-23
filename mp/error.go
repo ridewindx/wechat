@@ -9,6 +9,7 @@ const (
 )
 
 type Error interface {
+    error
     Code() int
     Msg() string
 }

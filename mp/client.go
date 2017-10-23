@@ -3,7 +3,6 @@ package public
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"io"
 	"io/ioutil"
 	"mime"
@@ -13,27 +12,24 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"fmt"
 )
 
 var BASE_URL URL = "https://api.weixin.qq.com/cgi-bin"
 
-type client struct {
+type Client struct {
+	*TokenAccessor
 	*http.Client
 }
 
-var Client = client{
-	Client: http.DefaultClient,
+func NewClient(appId, appSecret string) *Client {
+	return &Client{
+		TokenAccessor: NewTokenAccessor(appId, appSecret),
+		Client: http.DefaultClient,
+	}
 }
 
-func (c *client) Token() (string, error) {
-	return "", nil
-}
-
-func (c *client) RefreshToken() (string, error) {
-	return "", nil
-}
-
-func (c *client) call(u URL, rep interface{}, streamRep io.Writer, request func(URL) (*http.Response, error)) error {
+func (c *Client) call(u URL, rep interface{}, streamRep io.Writer, request func(URL) (*http.Response, error)) error {
 	token, err := c.Token()
 	if err != nil {
 		return err
@@ -49,7 +45,7 @@ RETRY:
 	defer r.Body.Close()
 
 	if r.StatusCode != http.StatusOK {
-		return errors.New(r.Status)
+		return fmt.Errorf("http.Status: %s", r.Status)
 	}
 
 	if streamRep != nil {
@@ -72,7 +68,7 @@ RETRY:
 	}
 	if (e.Code() == InvalidCredential || e.Code() == AccessTokenExpired) && firstTime {
 		firstTime = false
-		token, err = c.RefreshToken()
+		token, err = c.RefreshToken(token)
 		if err != nil {
 			return err
 		}
@@ -82,13 +78,13 @@ RETRY:
 	return rep.(error)
 }
 
-func (c *client) Get(u URL, rep interface{}) error {
+func (c *Client) Get(u URL, rep interface{}) error {
 	return c.call(u, rep, nil, func(u URL) (*http.Response, error) {
-		return c.Client.Get(u)
+		return c.Client.Get(string(u))
 	})
 }
 
-func (c *client) Post(u URL, req, rep interface{}) error {
+func (c *Client) Post(u URL, req, rep interface{}) error {
 	buf := &bytes.Buffer{}
 	err := json.NewEncoder(buf).Encode(req)
 	if err != nil {
@@ -96,7 +92,7 @@ func (c *client) Post(u URL, req, rep interface{}) error {
 	}
 
 	return c.call(u, rep, nil, func(u URL) (*http.Response, error) {
-		return c.Client.Post(u, "application/json; charset=utf-8", buf)
+		return c.Client.Post(string(u), "application/json; charset=utf-8", buf)
 	})
 }
 
@@ -116,26 +112,32 @@ func (fb *fileBuf) Write(p []byte) (n int, err error) {
 	}
 
 	pr := bytes.NewReader(p)
-	n, err = io.CopyN(&fb.Buffer, pr, MaxMemoryForFile+1-fb.n)
+	nn, err := io.CopyN(&fb.Buffer, pr, int64(MaxMemoryForFile+1-fb.n))
+	n = int(nn)
 	fb.n += n
 	if err != nil && err != io.EOF {
 		return
 	}
-	if fb.n > MaxMemoryForFile {
+	if fb.n > MaxMemoryForFile && fb.File == nil {
 		// too big, write to disk and flush buffer
-		file, err := ioutil.TempFile("", "multipart-")
+		var file *os.File
+		file, err = ioutil.TempFile("", "multipart-")
 		if err != nil {
 			return
 		}
-		fb.n, err = file.Write(p)
-		if cerr := file.Close(); err == nil {
-			err = cerr
+		p = p[n:]
+		fb.n, err = file.Write(fb.Buffer.Bytes())
+		if err == nil {
+			var nn int
+			nn, err = file.Write(p)
+			n += nn
+			fb.n += nn
 		}
 		if err != nil {
+			file.Close()
 			os.Remove(file.Name())
 			return
 		}
-		file.Seek(0, 0)
 
 		fb.File = file
 	}
@@ -143,17 +145,17 @@ func (fb *fileBuf) Write(p []byte) (n int, err error) {
 }
 
 func (fb *fileBuf) Close() error {
-	if fb.File {
+	if fb.File != nil {
 		return fb.File.Close()
 	}
 	return nil
 }
 
-func (c *client) UploadFile(u URL, name, filePath string, extraFields map[string]string, rep interface{}) error {
+func (c *Client) UploadFile(u URL, name, filePath string, extraFields map[string]string, rep interface{}) error {
 	var buf fileBuf
 	defer buf.Close()
 
-	mp := multipart.NewWriter(buf)
+	mp := multipart.NewWriter(&buf)
 	partWriter, err := mp.CreateFormFile(name, filepath.Base(filePath))
 	if err != nil {
 		return err
@@ -161,7 +163,7 @@ func (c *client) UploadFile(u URL, name, filePath string, extraFields map[string
 
 	file, err := os.Open(filePath)
 	if err != nil {
-		return
+		return err
 	}
 	defer file.Close()
 
@@ -171,7 +173,7 @@ func (c *client) UploadFile(u URL, name, filePath string, extraFields map[string
 
 	for k, v := range extraFields {
 		if err = mp.WriteField(k, v); err != nil {
-			return
+			return err
 		}
 	}
 
@@ -180,19 +182,22 @@ func (c *client) UploadFile(u URL, name, filePath string, extraFields map[string
 	}
 
 	var reader io.ReadSeeker
-	if buf.File {
+	if buf.File != nil {
 		reader = buf.File
 	} else {
 		reader = bytes.NewReader(buf.Buffer.Bytes())
 	}
 
 	return c.call(u, rep, nil, func(u URL) (*http.Response, error) {
-		reader.Seek(0, 0)
-		return c.Client.Post(u, mp.FormDataContentType, reader)
+		_, err := reader.Seek(0, 0)
+		if err != nil {
+			return nil, err
+		}
+		return c.Client.Post(string(u), mp.FormDataContentType(), reader)
 	})
 }
 
-func (c *client) DownloadFile(u URL, req interface{}, filePath string, rep interface{}) (err error) {
+func (c *Client) DownloadFile(u URL, req interface{}, filePath string, rep interface{}) (err error) {
 	file, err := os.Create(filePath)
 	if err != nil {
 		return err
@@ -207,7 +212,7 @@ func (c *client) DownloadFile(u URL, req interface{}, filePath string, rep inter
 
 	return c.call(u, rep, file, func(u URL) (*http.Response, error) {
 		if req == nil {
-			return c.Client.Get(u)
+			return c.Client.Get(string(u))
 		} else {
 			buf := &bytes.Buffer{}
 			err := json.NewEncoder(buf).Encode(req)
@@ -215,7 +220,7 @@ func (c *client) DownloadFile(u URL, req interface{}, filePath string, rep inter
 				return nil, err
 			}
 
-			return c.Client.Post(u, "application/json; charset=utf-8", buf)
+			return c.Client.Post(string(u), "application/json; charset=utf-8", buf)
 		}
 	})
 }
@@ -223,15 +228,18 @@ func (c *client) DownloadFile(u URL, req interface{}, filePath string, rep inter
 type URL string
 
 func (u URL) Join(segment string) URL {
-	return u + segment
+	return URL(string(u) + segment)
 }
 
 func (u URL) Query(key, value string) URL {
-	if strings.IndexByte(u, '?') != -1 {
-		u += '&'
+	buf := bytes.NewBufferString(string(u))
+	if strings.IndexByte(string(u), '?') > -1 {
+		buf.WriteByte('&')
 	} else {
-		u += '?'
+		buf.WriteByte('?')
 	}
-	u += key + '=' + url.QueryEscape(value)
-	return u
+	buf.WriteString(key)
+	buf.WriteByte('=')
+	buf.WriteString(url.QueryEscape(value))
+	return URL(buf.String())
 }

@@ -44,7 +44,7 @@ type OnlineAgent struct {
 	AcceptedCaseCount int    `json:"accepted_case"` // count of accepted cases
 }
 
-func (c *client) GetAgents() (agents []Agent, err error) {
+func (c *Client) GetAgents() (agents []Agent, err error) {
 	u := BASE_URL.Join("/customservice/getkflist")
 
 	var rep struct {
@@ -61,7 +61,7 @@ func (c *client) GetAgents() (agents []Agent, err error) {
 	return
 }
 
-func (c *client) GetOnlineAgents() (agents []OnlineAgent, err error) {
+func (c *Client) GetOnlineAgents() (agents []OnlineAgent, err error) {
 	u := BASE_URL.Join("/customservice/getonlinekflist")
 
 	var rep struct {
@@ -78,7 +78,7 @@ func (c *client) GetOnlineAgents() (agents []OnlineAgent, err error) {
 	return
 }
 
-func (c *client) createOrUpdateAgent(action, account, nickname, password string, isPlain bool) (err error) {
+func (c *Client) createOrUpdateAgent(action, account, nickname, password string, isPlain bool) (err error) {
 	u := BASE_URL.Join("/customservice/kfaccount/" + action)
 
 	if password != "" && isPlain {
@@ -102,15 +102,15 @@ func (c *client) createOrUpdateAgent(action, account, nickname, password string,
 	return
 }
 
-func (c *client) CreateAgent(account, nickname, password string, isPlain bool) (err error) {
+func (c *Client) CreateAgent(account, nickname, password string, isPlain bool) (err error) {
 	return c.createOrUpdateAgent("add", account, nickname, password, isPlain)
 }
 
-func (c *client) UpdateAgent(account, nickname, password string, isPlain bool) (err error) {
+func (c *Client) UpdateAgent(account, nickname, password string, isPlain bool) (err error) {
 	return c.createOrUpdateAgent("update", account, nickname, password, isPlain)
 }
 
-func (c *client) DeleteAgent(account string) (err error) {
+func (c *Client) DeleteAgent(account string) (err error) {
 	u := BASE_URL.Join("/customservice/kfaccount/del").Query("kf_account", account)
 
 	var rep Err
@@ -119,7 +119,7 @@ func (c *client) DeleteAgent(account string) (err error) {
 	return
 }
 
-func (c *client) UploadAgentHeadImage(account, filePath string) (err error) {
+func (c *Client) UploadAgentHeadImage(account, filePath string) (err error) {
 	u := BASE_URL.Join("/customservice/kfaccount/uploadheadimg").Query("kf_account", account)
 
 	var rep Err
@@ -127,7 +127,7 @@ func (c *client) UploadAgentHeadImage(account, filePath string) (err error) {
 	return c.UploadFile(u, "media", filePath, nil, &rep)
 }
 
-func (c *client) createOrCloseAgentSession(action, account, openId, text string) (err error) {
+func (c *Client) createOrCloseAgentSession(action, account, openId, text string) (err error) {
 	u := BASE_URL.Join("/customservice/kfsession/" + action)
 
 	var req = struct {
@@ -146,11 +146,11 @@ func (c *client) createOrCloseAgentSession(action, account, openId, text string)
 	return
 }
 
-func (c *client) CreateAgentSession(account, openId, text string) (err error) {
+func (c *Client) CreateAgentSession(account, openId, text string) (err error) {
 	return c.createOrCloseAgentSession("create", account, openId, text)
 }
 
-func (c *client) CloseAgentSession(account, openId, text string) (err error) {
+func (c *Client) CloseAgentSession(account, openId, text string) (err error) {
 	return c.createOrCloseAgentSession("close", account, openId, text)
 }
 
@@ -160,7 +160,7 @@ type AgentSession struct {
 	CreateTime int64  `json:"createtime"`
 }
 
-func (c *client) GetAgentSessionForCustomer(openId string) (session *AgentSession, err error) {
+func (c *Client) GetAgentSessionForCustomer(openId string) (session *AgentSession, err error) {
 	u := BASE_URL.Join("/customservice/kfsession/getsession").Query("openid", openId)
 
 	var rep struct {
@@ -178,7 +178,7 @@ func (c *client) GetAgentSessionForCustomer(openId string) (session *AgentSessio
 	return
 }
 
-func (c *client) GetAgentSessions(account string) (sessions []AgentSession, err error) {
+func (c *Client) GetAgentSessions(account string) (sessions []AgentSession, err error) {
 	u := BASE_URL.Join("/customservice/kfsession/getsessionlist").Query("kf_account", account)
 
 	var rep struct {
@@ -198,7 +198,7 @@ func (c *client) GetAgentSessions(account string) (sessions []AgentSession, err 
 	return
 }
 
-func (c *client) GetWaitingAgentSessions() (totalCount int, sessions []AgentSession, err error) {
+func (c *Client) GetWaitingAgentSessions() (totalCount int, sessions []AgentSession, err error) {
 	u := BASE_URL.Join("/customservice/kfsession/getwaitcase")
 
 	var rep struct {
@@ -255,7 +255,7 @@ type MsgRecord struct {
 	Text      string `json:"text"` // message text
 }
 
-func (c *client) GetAgentMsgRecords(timeSpan *TimeSpan, pageIndex int, pageSize ...int) (records []MsgRecord, err error) {
+func (c *Client) GetAgentMsgRecords(timeSpan *TimeSpan, pageIndex int, pageSize ...int) (records []MsgRecord, err error) {
 	u := BASE_URL.Join("/customservice/msgrecord/getrecord")
 
 	if pageIndex < 1 {
@@ -275,7 +275,7 @@ func (c *client) GetAgentMsgRecords(timeSpan *TimeSpan, pageIndex int, pageSize 
 		PageIndex int `json:"pageindex"` // base 1
 		PageSize  int `json:"pagesize"`  // limit 50
 	}{
-		TimeSpan:  timeSpan,
+		TimeSpan:  *timeSpan,
 		PageIndex: pageIndex,
 		PageSize:  size,
 	}

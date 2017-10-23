@@ -9,30 +9,34 @@ const (
 	MsgCard  = "wxcard"
 )
 
-type msgFilter struct {
-	isToAll bool `json:"is_to_all"`
-	groupId int  `json:"group_id"`
+type MsgFilter struct {
+	IsToAll bool `json:"is_to_all"`
+	GroupId int  `json:"group_id"`
 }
 
 type msgHeader struct {
-	*msgFilter `json:"filter,omitempty"`
-	msgType    string   `json:"msgtype"`
-	toUsers    []string `json:"touser,omitempty"`
+	*MsgFilter       `json:"filter,omitempty"`
+	MsgType string   `json:"msgtype"`
+	ToUsers []string `json:"touser,omitempty"`
 }
 
 type msgPreviewHeader struct {
-	msgType string `json:"msgtype"`
-	toUser  string `json:"touser,omitempty"`
-	wxName  string `json:"towxname,omitempty"`
+	MsgType string `json:"msgtype"`
+	ToUser  string `json:"touser,omitempty"`
+	WxName  string `json:"towxname,omitempty"`
+}
+
+type Text struct {
+	Content string `json:"content"`
 }
 
 const (
-	SendAll = iota
+	SendAll        = iota
 	SendByUsers
 	SendForPreview
 )
 
-func (c *client) send(msg interface{}, sendType int) (id, dataId int, err error) {
+func (c *Client) send(msg interface{}, sendType int) (id, dataId int, err error) {
 	var u URL
 	switch sendType {
 	case SendAll:
@@ -62,55 +66,59 @@ func (c *client) send(msg interface{}, sendType int) (id, dataId int, err error)
 }
 
 func newMsgHeader(msgType string, groupId []int, userIds []string) *msgHeader {
-	var f *msgFilter
+	var f *MsgFilter
 	if userIds == nil {
 		if len(groupId) > 0 {
-			f = &msgFilter{false, groupId[0]}
+			f = &MsgFilter{false, groupId[0]}
 		} else {
-			f = &msgFilter{true, 0}
+			f = &MsgFilter{true, 0}
 		}
 	}
 	return &msgHeader{
-		msgFilter: f,
-		msgType:   msgType,
-		toUsers:   userIds,
+		MsgFilter: f,
+		MsgType:   msgType,
+		ToUsers:   userIds,
 	}
 }
 
 func newMsgPreviewHeader(msgType, wxName string) *msgPreviewHeader {
 	return &msgPreviewHeader{
-		msgType: msgType,
-		toUser:  wxName,
-		wxName:  wxName,
+		MsgType: msgType,
+		ToUser:  wxName,
+		WxName:  wxName,
 	}
 }
 
-func (c *client) sendText(content string, groupId []int, userIds []string) (id int, err error) {
+func getSendType(userIds []string) int {
+	if userIds != nil {
+		return SendByUsers
+	} else {
+		return SendAll
+	}
+}
+
+func (c *Client) sendText(content string, groupId []int, userIds []string) (id int, err error) {
 	var msg = struct {
 		*msgHeader
-		Text struct {
-			Content string `json:"content"`
-		} `json:"text"`
+		Text `json:"text"`
 	}{
 		msgHeader: newMsgHeader(MsgText, groupId, userIds),
-		Text: {
+		Text: Text{
 			Content: content,
 		},
 	}
 
-	id, _, err = c.send(&msg, int(userIds != nil))
+	id, _, err = c.send(&msg, getSendType(userIds))
 	return
 }
 
-func (c *client) SendTextForPreview(content, wxName string) (id int, err error) {
+func (c *Client) SendTextForPreview(content, wxName string) (id int, err error) {
 	var msg = struct {
 		*msgPreviewHeader
-		Text struct {
-			Content string `json:"content"`
-		} `json:"text"`
+		Text `json:"text"`
 	}{
 		msgPreviewHeader: newMsgPreviewHeader(MsgText, wxName),
-		Text: {
+		Text: Text{
 			Content: content,
 		},
 	}
@@ -119,40 +127,40 @@ func (c *client) SendTextForPreview(content, wxName string) (id int, err error) 
 	return
 }
 
-func (c *client) SendTextAll(content string, groupId ...int) (id int, err error) {
+func (c *Client) SendTextAll(content string, groupId ...int) (id int, err error) {
 	return c.sendText(content, groupId, nil)
 }
 
-func (c *client) SendTextByUsers(content string, userIds []string) (id int, err error) {
+func (c *Client) SendTextByUsers(content string, userIds []string) (id int, err error) {
 	return c.sendText(content, nil, userIds)
 }
 
-func (c *client) sendImage(mediaId string, groupId []int, userIds []string) (id int, err error) {
+type Image struct {
+	MediaId string `json:"media_id"`
+}
+
+func (c *Client) sendImage(mediaId string, groupId []int, userIds []string) (id int, err error) {
 	var msg = struct {
-		msgHeader
-		Image struct {
-			MediaId string `json:"media_id"`
-		} `json:"image"`
+		*msgHeader
+		Image Image `json:"image"`
 	}{
 		msgHeader: newMsgHeader(MsgImage, groupId, userIds),
-		Image: {
+		Image: Image{
 			MediaId: mediaId,
 		},
 	}
 
-	id, _, err = c.send(&msg, int(userIds != nil))
+	id, _, err = c.send(&msg, getSendType(userIds))
 	return
 }
 
-func (c *client) SendImageForPreview(mediaId, wxName string) (id int, err error) {
+func (c *Client) SendImageForPreview(mediaId, wxName string) (id int, err error) {
 	var msg = struct {
 		*msgPreviewHeader
-		Image struct {
-			MediaId string `json:"media_id"`
-		} `json:"image"`
+		Image Image `json:"image"`
 	}{
 		msgPreviewHeader: newMsgPreviewHeader(MsgImage, wxName),
-		Image: {
+		Image: Image{
 			MediaId: mediaId,
 		},
 	}
@@ -161,40 +169,40 @@ func (c *client) SendImageForPreview(mediaId, wxName string) (id int, err error)
 	return
 }
 
-func (c *client) SendImageAll(mediaId string, groupId ...int) (id int, err error) {
+func (c *Client) SendImageAll(mediaId string, groupId ...int) (id int, err error) {
 	return c.sendImage(mediaId, groupId, nil)
 }
 
-func (c *client) SendImageByUsers(mediaId string, userIds []string) (id int, err error) {
+func (c *Client) SendImageByUsers(mediaId string, userIds []string) (id int, err error) {
 	return c.sendImage(mediaId, nil, userIds)
 }
 
-func (c *client) sendVoice(mediaId string, groupId []int, userIds []string) (id int, err error) {
+type Voice struct {
+	MediaId string `json:"media_id"`
+}
+
+func (c *Client) sendVoice(mediaId string, groupId []int, userIds []string) (id int, err error) {
 	var msg = struct {
-		msgHeader
-		Voice struct {
-			MediaId string `json:"media_id"`
-		} `json:"voice"`
+		*msgHeader
+		Voice Voice `json:"voice"`
 	}{
 		msgHeader: newMsgHeader(MsgVoice, groupId, userIds),
-		Voice: {
+		Voice: Voice{
 			MediaId: mediaId,
 		},
 	}
 
-	id, _, err = c.send(&msg, int(userIds != nil))
+	id, _, err = c.send(&msg, getSendType(userIds))
 	return
 }
 
-func (c *client) SendVoiceForPreview(mediaId, wxName string) (id int, err error) {
+func (c *Client) SendVoiceForPreview(mediaId, wxName string) (id int, err error) {
 	var msg = struct {
 		*msgPreviewHeader
-		Voice struct {
-			MediaId string `json:"media_id"`
-		} `json:"voice"`
+		Voice Voice `json:"voice"`
 	}{
 		msgPreviewHeader: newMsgPreviewHeader(MsgVoice, wxName),
-		Voice: {
+		Voice: Voice{
 			MediaId: mediaId,
 		},
 	}
@@ -203,40 +211,40 @@ func (c *client) SendVoiceForPreview(mediaId, wxName string) (id int, err error)
 	return
 }
 
-func (c *client) SendVoiceAll(mediaId string, groupId ...int) (id int, err error) {
+func (c *Client) SendVoiceAll(mediaId string, groupId ...int) (id int, err error) {
 	return c.sendVoice(mediaId, groupId, nil)
 }
 
-func (c *client) SendVoiceByUsers(mediaId string, userIds []string) (id int, err error) {
+func (c *Client) SendVoiceByUsers(mediaId string, userIds []string) (id int, err error) {
 	return c.sendVoice(mediaId, nil, userIds)
 }
 
-func (c *client) sendVideo(mediaId string, groupId []int, userIds []string) (id int, err error) {
+type video struct {
+	MediaId string `json:"media_id"`
+}
+
+func (c *Client) sendVideo(mediaId string, groupId []int, userIds []string) (id int, err error) {
 	var msg = struct {
-		msgHeader
-		Video struct {
-			MediaId string `json:"media_id"`
-		} `json:"mpvideo"`
+		*msgHeader
+		Video video `json:"mpvideo"`
 	}{
 		msgHeader: newMsgHeader(MsgVideo, groupId, userIds),
-		Video: {
+		Video: video{
 			MediaId: mediaId,
 		},
 	}
 
-	id, _, err = c.send(&msg, int(userIds != nil))
+	id, _, err = c.send(&msg, getSendType(userIds))
 	return
 }
 
-func (c *client) SendVideoForPreview(mediaId, wxName string) (id int, err error) {
+func (c *Client) SendVideoForPreview(mediaId, wxName string) (id int, err error) {
 	var msg = struct {
 		*msgPreviewHeader
-		Video struct {
-			MediaId string `json:"media_id"`
-		} `json:"mpvideo"`
+		Video video `json:"mpvideo"`
 	}{
 		msgPreviewHeader: newMsgPreviewHeader(MsgVideo, wxName),
-		Video: {
+		Video: video{
 			MediaId: mediaId,
 		},
 	}
@@ -245,40 +253,40 @@ func (c *client) SendVideoForPreview(mediaId, wxName string) (id int, err error)
 	return
 }
 
-func (c *client) SendVideoAll(mediaId string, groupId ...int) (id int, err error) {
+func (c *Client) SendVideoAll(mediaId string, groupId ...int) (id int, err error) {
 	return c.sendVideo(mediaId, groupId, nil)
 }
 
-func (c *client) SendVideoByUsers(mediaId string, userIds []string) (id int, err error) {
+func (c *Client) SendVideoByUsers(mediaId string, userIds []string) (id int, err error) {
 	return c.sendVideo(mediaId, nil, userIds)
 }
 
-func (c *client) sendNews(mediaId string, groupId []int, userIds []string) (id, dataId int, err error) {
+type news struct {
+	MediaId string `json:"media_id"`
+}
+
+func (c *Client) sendNews(mediaId string, groupId []int, userIds []string) (id, dataId int, err error) {
 	var msg = struct {
-		msgHeader
-		News struct {
-			MediaId string `json:"media_id"`
-		} `json:"mpnews"`
+		*msgHeader
+		News news `json:"mpnews"`
 	}{
 		msgHeader: newMsgHeader(MsgNews, groupId, userIds),
-		News: {
+		News: news{
 			MediaId: mediaId,
 		},
 	}
 
-	id, dataId, err = c.send(&msg, int(userIds != nil))
+	id, dataId, err = c.send(&msg, getSendType(userIds))
 	return
 }
 
-func (c *client) SendNewsForPreview(mediaId, wxName string) (id, dataId int, err error) {
+func (c *Client) SendNewsForPreview(mediaId, wxName string) (id, dataId int, err error) {
 	var msg = struct {
 		*msgPreviewHeader
-		News struct {
-			MediaId string `json:"media_id"`
-		} `json:"mpnews"`
+		News news `json:"mpnews"`
 	}{
 		msgPreviewHeader: newMsgPreviewHeader(MsgNews, wxName),
-		News: {
+		News: news{
 			MediaId: mediaId,
 		},
 	}
@@ -287,43 +295,42 @@ func (c *client) SendNewsForPreview(mediaId, wxName string) (id, dataId int, err
 	return
 }
 
-func (c *client) SendNewsAll(mediaId string, groupId ...int) (id, dataId int, err error) {
+func (c *Client) SendNewsAll(mediaId string, groupId ...int) (id, dataId int, err error) {
 	return c.sendNews(mediaId, groupId, nil)
 }
 
-func (c *client) SendNewsByUsers(mediaId string, userIds []string) (id, dataId int, err error) {
+func (c *Client) SendNewsByUsers(mediaId string, userIds []string) (id, dataId int, err error) {
 	return c.sendNews(mediaId, nil, userIds)
 }
 
-func (c *client) sendCard(cardId, cardExt string, groupId []int, userIds []string) (id int, err error) {
+type Card struct {
+	Id  string `json:"card_id"`
+	Ext string `json:"card_ext,omitempty"`
+}
+
+func (c *Client) sendCard(cardId, cardExt string, groupId []int, userIds []string) (id int, err error) {
 	var msg = struct {
-		msgHeader
-		Card struct {
-			Id  string `json:"card_id"`
-			Ext string `json:"card_ext,omitempty"`
-		} `json:"wxcard"`
+		*msgHeader
+		Card Card `json:"wxcard"`
 	}{
 		msgHeader: newMsgHeader(MsgCard, groupId, userIds),
-		Card: {
+		Card: Card{
 			Id:  cardId,
 			Ext: cardExt,
 		},
 	}
 
-	id, _, err = c.send(&msg, int(userIds != nil))
+	id, _, err = c.send(&msg, getSendType(userIds))
 	return
 }
 
-func (c *client) SendCardForPreview(cardId, cardExt, wxName string) (id int, err error) {
+func (c *Client) SendCardForPreview(cardId, cardExt, wxName string) (id int, err error) {
 	var msg = struct {
 		*msgPreviewHeader
-		Card struct {
-			Id  string `json:"card_id"`
-			Ext string `json:"card_ext,omitempty"`
-		} `json:"wxcard"`
+		Card Card `json:"wxcard"`
 	}{
 		msgPreviewHeader: newMsgPreviewHeader(MsgCard, wxName),
-		Card: {
+		Card: Card{
 			Id:  cardId,
 			Ext: cardExt,
 		},
@@ -333,17 +340,17 @@ func (c *client) SendCardForPreview(cardId, cardExt, wxName string) (id int, err
 	return
 }
 
-func (c *client) SendCardAll(cardId, cardExt string, groupId ...int) (id int, err error) {
+func (c *Client) SendCardAll(cardId, cardExt string, groupId ...int) (id int, err error) {
 	return c.sendCard(cardId, cardExt, groupId, nil)
 }
 
-func (c *client) SendCardByUsers(cardId, cardExt string, userIds []string) (id int, err error) {
+func (c *Client) SendCardByUsers(cardId, cardExt string, userIds []string) (id int, err error) {
 	return c.sendCard(cardId, cardExt, nil, userIds)
 }
 
 // DeleteMsg deletes the mass message(only MsgNews and MsgVideo) which was sent in half an hour.
 // It invalidates the message content page, but still retains the message card.
-func (c *client) DeleteMsg(msgId string) error {
+func (c *Client) DeleteMsg(msgId int64) error {
 	u := BASE_URL.Join("/message/mass/delete")
 
 	var req = struct {
@@ -357,11 +364,11 @@ func (c *client) DeleteMsg(msgId string) error {
 	return c.Post(u, &req, &rep)
 }
 
-func (c *client) IsMsgSent(msgId string) (bool, error) {
+func (c *Client) IsMsgSent(msgId int64) (bool, error) {
 	u := BASE_URL.Join("/message/mass/get")
 
 	var req = struct {
-		Id int `json:"msg_id"`
+		Id int64 `json:"msg_id"`
 	}{
 		Id: msgId,
 	}
@@ -377,14 +384,14 @@ func (c *client) IsMsgSent(msgId string) (bool, error) {
 		return false, err
 	}
 
-	return (rep.Status == "SEND_SUCCESS"), nil
+	return rep.Status == "SEND_SUCCESS", nil
 }
 
 func (ctx *Context) ReplyText(content string) {
 	var rep = struct {
 		XMLName struct{} `xml:"xml"`
 		*EventHeader
-		Content string `xml:"Content"`
+		Content string   `xml:"Content"`
 	}{
 		EventHeader: responseEventHeader("text", ctx.Event),
 		Content:     content,
@@ -438,7 +445,7 @@ func (ctx *Context) ReplyVideo(mediaId, title, description string) {
 	var rep = struct {
 		XMLName struct{} `xml:"xml"`
 		*EventHeader
-		Video `xml:"Video"`
+		Video            `xml:"Video"`
 	}{
 		EventHeader: responseEventHeader("video", ctx.Event),
 		Video: Video{
@@ -464,7 +471,7 @@ func (ctx *Context) ReplyMusic(music *Music) {
 	var rep = struct {
 		XMLName struct{} `xml:"xml"`
 		*EventHeader
-		*Music `xml:"Music"`
+		*Music           `xml:"Music"`
 	}{
 		EventHeader: responseEventHeader("music", ctx.Event),
 		Music:       music,
@@ -483,7 +490,7 @@ type ResponseArticle struct {
 
 func (ctx *Context) ReplyNews(articles []ResponseArticle) {
 	var rep = struct {
-		XMLName struct{} `xml:"xml"`
+		XMLName  struct{}          `xml:"xml"`
 		*EventHeader
 		Count    int               `xml:"ArticleCount"`
 		Articles []ResponseArticle `xml:"Articles>item"`

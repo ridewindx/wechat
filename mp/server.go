@@ -148,12 +148,15 @@ func (srv *Server) HandleEvent(eventType string, handler Handler) {
 	srv.eventHandlerMap[eventType] = handler
 }
 
-func NewServer() *Server {
+func NewServer(token, aesKey string) *Server {
 	srv := &Server{
 		Mel:               mel.New(),
 		messageHandlerMap: make(map[string]Handler),
 		eventHandlerMap:   make(map[string]Handler),
 	}
+
+	srv.SetToken(token)
+	srv.SetAESKey(aesKey)
 
 	equal := func(a, b string) bool {
 		return subtle.ConstantTimeCompare([]byte(a), []byte(b)) == 1

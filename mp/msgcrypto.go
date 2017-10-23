@@ -21,7 +21,7 @@ func encryptMsg(random, msg, appId, aesKey []byte) []byte {
     text := make([]byte, textLen)
 
     copy(text[:16], random)
-    binary.BigEndian.PutUint32(text[16:20], msgLen)
+    binary.BigEndian.PutUint32(text[16:20], uint32(msgLen))
     copy(text[20:], msg)
     copy(text[20+msgLen:], appId)
 

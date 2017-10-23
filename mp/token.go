@@ -1,10 +1,8 @@
 package public
 
 import (
-	"errors"
 	"fmt"
 	"encoding/json"
-	"math"
 	"net/http"
 	"net/url"
 	"sync/atomic"
@@ -16,11 +14,6 @@ const (
 	validityDuration = time.Duration(7200) * time.Second
 )
 
-type Token struct {
-	AccessToken string `json:"access_token"`
-	ExpiresIn   int64  `json:"expires_in"`
-}
-
 type refreshResult struct {
 	token string
 	err   error
@@ -29,27 +22,28 @@ type refreshResult struct {
 type TokenAccessor struct {
 	appId     string
 	appSecret string
+	url string
 
-	refreshRequest  chan struct{}
-	refreshResponse chan refreshResult
-	done            chan struct{}
+	refreshReq chan string
+	refreshRep chan refreshResult
+	done       chan struct{}
 
 	token     atomic.Value
-	lastToken string
 }
 
 func NewTokenAccessor(appId, appSecret string) (ta *TokenAccessor) {
 	ta = &TokenAccessor{
-		appId:           url.QueryEscape(appId),
-		appSecret:       url.QueryEscape(appSecret),
-		refreshRequest:  make(chan struct{}),
-		refreshResponse: make(chan refreshResult),
-		done:            make(chan struct{}),
+		appId:      url.QueryEscape(appId),
+		appSecret:  url.QueryEscape(appSecret),
+		refreshReq: make(chan string),
+		refreshRep: make(chan refreshResult),
+		done:       make(chan struct{}),
 	}
+	ta.url = fmt.Sprintf(wechatTokenUrl, ta.appId, ta.appSecret)
 	return
 }
 
-func (ta *TokenAccessor) Run() {
+func (ta *TokenAccessor) Start() {
 	go ta.updateTokenLoop()
 }
 
@@ -59,99 +53,100 @@ func (ta *TokenAccessor) Stop() {
 }
 
 func (ta *TokenAccessor) Token() (token string, err error) {
-	t := ta.token.Load().(Token)
-	if t.AccessToken != "" {
-		ta.lastToken = t.AccessToken
-		return t.AccessToken, nil
+	token, ok := ta.token.Load().(string)
+	if ok && token != "" {
+		return token, nil
 	}
 
-	return ta.RefreshToken()
+	return ta.RefreshToken("")
 }
 
-func (ta *TokenAccessor) RefreshToken() (token string, err error) {
-	ta.refreshRequest <- struct{}{}
-	rep := <-ta.refreshResponse
-	ta.lastToken = rep.token
+func (ta *TokenAccessor) RefreshToken(usedToken string) (token string, err error) {
+	ta.refreshReq <- usedToken
+	rep := <-ta.refreshRep
 	return rep.token, rep.err
 }
 
 func (ta *TokenAccessor) updateTokenLoop() {
 	tickDuration := validityDuration
 	ticker := time.NewTicker(tickDuration)
+
+LOOP:
 	for {
 		select {
 		case <-ticker.C:
-			token, err := ta.updateToken()
+			_, expiresIn, err := ta.updateToken()
 			if err != nil {
 				break
 			}
-			newTickDuration := time.Duration(token.ExpiresIn) * time.Second
+			newTickDuration := time.Duration(expiresIn) * time.Second
 			if newTickDuration < tickDuration || newTickDuration-tickDuration > 5*time.Second {
 				tickDuration = newTickDuration
 				ticker.Stop()
 				ticker = time.NewTicker(tickDuration)
 			}
 
-		case <-ta.refreshRequest:
-			token, err := ta.updateToken()
+		case usedToken := <-ta.refreshReq:
+			if usedToken != "" {
+				token, ok := ta.token.Load().(string)
+				if ok && token != "" && usedToken != token {
+					ta.refreshRep <- refreshResult{token: token}
+					break
+				}
+			}
+			token, expiresIn, err := ta.updateToken()
 			if err != nil {
-				ta.refreshResponse <- refreshResult{err: err}
+				ta.refreshRep <- refreshResult{err: err}
 				break
 			}
 
-			ta.refreshResponse <- refreshResult{token: token.AccessToken}
+			ta.refreshRep <- refreshResult{token: token}
 
-			tickDuration = time.Duration(token.ExpiresIn) * time.Second
+			tickDuration = time.Duration(expiresIn) * time.Second
 			ticker.Stop()
 			ticker = time.NewTicker(tickDuration)
 
 		case <-ta.done:
-			<-ta.done
+			break LOOP
 		}
 	}
+
+	ticker.Stop()
+	ta.done <- struct{}{}
 }
 
-func (ta *TokenAccessor) updateToken() (token Token, err error) {
-	if ta.lastToken != "" {
-		t := ta.token.Load().(Token)
-		if t.AccessToken != "" && ta.lastToken != t.AccessToken {
-			return t.AccessToken, nil
-		}
-	}
+func (ta *TokenAccessor) updateToken() (token string, expiresIn int64, err error) {
+	defer ta.token.Store(token)
 
-	rep, err := http.Get(fmt.Sprintf(wechatTokenUrl, ta.appId, ta.appSecret))
+	rep, err := http.Get(ta.url)
 	if err != nil {
-		ta.token.Store(Token{})
 		return
 	}
 	defer rep.Body.Close()
 
 	if rep.StatusCode != http.StatusOK {
-		ta.token.Store(Token{})
 		err = fmt.Errorf("http.Status: %s", rep.Status)
 		return
 	}
 
 	var result struct {
-		Token
-		Error
+		AccessToken string `json:"access_token"`
+		ExpiresIn   int64  `json:"expires_in"`
+		Err
 	}
 
-	if err = json.NewDecoder(rep).Decode(&result); err != nil {
-		ta.token.Store(Token{})
+	if err = json.NewDecoder(rep.Body).Decode(&result); err != nil {
 		return
 	}
 
-	if result.Code != OK {
-		ta.token.Store(Token{})
-		err = &result.Error
+	if result.Code() != OK {
+		err = &result.Err
 		return
 	}
 
-	switch e := result.ExpiresIn; e {
+	switch e := result.ExpiresIn; {
 	case e > 60*60*24*365:
-		ta.token.Store(Token{})
-		err = errors.New(fmt.Sprintf("expires_in too large: %d", e))
+		err = fmt.Errorf("expires_in too large: %d", e)
 		return
 	case e > 60*60:
 		result.ExpiresIn -= 60 * 10
@@ -162,11 +157,10 @@ func (ta *TokenAccessor) updateToken() (token Token, err error) {
 	case e > 60:
 		result.ExpiresIn -= 10
 	default:
-		ta.token.Store(Token{})
-		err = errors.New(fmt.Sprintf("expires_in too small: %d", e))
+		err = fmt.Errorf("expires_in too small: %d", e)
 		return
 	}
 
-	ta.token.Store(result.Token)
-	return result.Token, nil
+	token, expiresIn = result.AccessToken, result.ExpiresIn
+	return
 }

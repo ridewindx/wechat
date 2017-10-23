@@ -15,7 +15,7 @@ type UserList struct {
 	NextId string `json:"next_openid"`
 }
 
-func (c *client) GetUserList(nextId string) (*UserList, error) {
+func (c *Client) GetUserList(nextId string) (*UserList, error) {
 	u := BASE_URL.Join("/user/get")
 	if nextId != "" {
 		u = u.Query("next_openid", nextId)
@@ -34,7 +34,7 @@ func (c *client) GetUserList(nextId string) (*UserList, error) {
 	return &rep.UserList, nil
 }
 
-func (c *client) UpdateUserRemark(openId, remark string) error {
+func (c *Client) UpdateUserRemark(openId, remark string) error {
 	u := BASE_URL.Join("/user/info/updateremark")
 
 	var req = struct {
@@ -72,7 +72,7 @@ type User struct {
 	GroupId       int  `json:"groupid"`
 }
 
-func (c *client) GetUser(openId string, lang ...string) (*User, error) {
+func (c *Client) GetUser(openId string, lang ...string) (*User, error) {
 	u := BASE_URL.Join("/user/info")
 	u = u.Query("openid", openId)
 	if len(lang) > 0 {
@@ -92,7 +92,7 @@ func (c *client) GetUser(openId string, lang ...string) (*User, error) {
 	return &rep.User, nil
 }
 
-func (c *client) GetUsers(openIds string, lang ...string) ([]User, error) {
+func (c *Client) GetUsers(openIds []string, lang ...string) ([]User, error) {
 	u := BASE_URL.Join("/user/info/batchget")
 	language := LangZhCN
 	if len(lang) > 0 {
@@ -132,7 +132,7 @@ type Group struct {
 	UserCount int    `json:"count"`
 }
 
-func (c *client) GetGroups() ([]Group, error) {
+func (c *Client) GetGroups() ([]Group, error) {
 	u := BASE_URL.Join("/groups/get")
 
 	var rep struct {
@@ -145,10 +145,10 @@ func (c *client) GetGroups() ([]Group, error) {
 		return nil, err
 	}
 
-	return &rep.Groups, nil
+	return rep.Groups, nil
 }
 
-func (c *client) GetGroupByUser(openId string) (groupId int, err error) {
+func (c *Client) GetGroupByUser(openId string) (groupId int, err error) {
 	u := BASE_URL.Join("/groups/getid")
 
 	var req = struct {
@@ -170,17 +170,17 @@ func (c *client) GetGroupByUser(openId string) (groupId int, err error) {
 	return
 }
 
-func (c *client) CreateGroup(name string) (*Group, error) {
+func (c *Client) CreateGroup(name string) (*Group, error) {
 	u := BASE_URL.Join("/groups/create")
 
+	type group struct {
+		Name string `json:"name"`
+	}
+
 	var req = struct {
-		Group struct {
-			Name string `json:"name"`
-		} `json:"group"`
+		Group group `json:"group"`
 	}{
-		Group{
-			Name: name,
-		},
+		Group: group{name},
 	}
 
 	var rep struct {
@@ -196,16 +196,18 @@ func (c *client) CreateGroup(name string) (*Group, error) {
 	return &rep.Group, nil
 }
 
-func (c *client) UpdateGroup(id int, name string) error {
+func (c *Client) UpdateGroup(id string, name string) error {
 	u := BASE_URL.Join("/groups/update")
 
+	type group struct {
+		Id   string `json:"id"`
+		Name string `json:"name"`
+	}
+
 	var req = struct {
-		Group struct {
-			Id   string `json:"id"`
-			Name string `json:"name"`
-		} `json:"group"`
+		Group group `json:"group"`
 	}{
-		Group{
+		Group: group{
 			Id:   id,
 			Name: name,
 		},
@@ -216,7 +218,7 @@ func (c *client) UpdateGroup(id int, name string) error {
 	return err
 }
 
-func (c *client) ChangeGroupForUser(openId string, groupId int) error {
+func (c *Client) ChangeGroupForUser(openId string, groupId int) error {
 	u := BASE_URL.Join("/groups/members/update")
 
 	var req = struct {
@@ -232,7 +234,7 @@ func (c *client) ChangeGroupForUser(openId string, groupId int) error {
 	return err
 }
 
-func (c *client) ChangeGroupForUsers(openIds []string, groupId int) error {
+func (c *Client) ChangeGroupForUsers(openIds []string, groupId int) error {
 	if len(openIds) > 50 {
 		return fmt.Errorf("openIds num too big: %d", len(openIds))
 	}
@@ -252,15 +254,17 @@ func (c *client) ChangeGroupForUsers(openIds []string, groupId int) error {
 	return err
 }
 
-func (c *client) DeleteCroup(id int) error {
+func (c *Client) DeleteCroup(id string) error {
 	u := BASE_URL.Join("/groups/delete")
 
+	type group struct {
+		Id string `json:"id"`
+	}
+
 	var req = struct {
-		Group struct {
-			Id string `json:"id"`
-		} `json:"group"`
+		Group group `json:"group"`
 	}{
-		Group{
+		Group: group{
 			Id: id,
 		},
 	}
