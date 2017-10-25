@@ -230,11 +230,9 @@ func NewServer(token, aesKey string) *Server {
 		Encrypt    string `xml:",cdata"`
 	}
 
-	if srv.urlPrefix != "" {
-		srv.Get("/", func(c *mel.Context) { // health check
-			c.Status(200)
-		})
-	}
+	srv.Head("/", func(c *mel.Context) { // health check
+		c.Status(200)
+	})
 
 	srv.Get(srv.urlPrefix+"/", func(c *mel.Context) {
 		if verifySign(c) {
