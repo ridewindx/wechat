@@ -1,4 +1,4 @@
-package public
+package mp
 
 // Received message types
 const (

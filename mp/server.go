@@ -1,4 +1,4 @@
-package public
+package mp
 
 import (
 	"bufio"
@@ -14,13 +14,20 @@ import (
 	"sync"
 	"sync/atomic"
 	"unsafe"
+	"go.uber.org/zap"
+	"github.com/jiudaoyun/wechat"
+	"net/http"
+	"fmt"
+	"encoding/json"
+	"strings"
 )
 
 type Server struct {
 	*mel.Mel
+	urlPrefix string
 
-	appId  string
-	userId string
+	appID string // App ID
+	ID    string // Wechat ID
 
 	tokenMutex sync.Mutex
 	token      unsafe.Pointer
@@ -28,9 +35,32 @@ type Server struct {
 	aesKeyMutex sync.Mutex
 	aesKey      unsafe.Pointer
 
+	client *Client
 	middlewares       []Handler
 	messageHandlerMap map[string]Handler
 	eventHandlerMap   map[string]Handler
+
+	*zap.SugaredLogger
+}
+
+func (srv *Server) SetURLPrefix(urlPrefix string) {
+	if !strings.HasPrefix(urlPrefix, "/") {
+		urlPrefix = "/" + urlPrefix
+	}
+	urlPrefix = strings.TrimRight(urlPrefix, "/")
+	srv.urlPrefix = urlPrefix
+}
+
+func (srv *Server) SetID(id string) {
+	srv.ID = id
+}
+
+func (srv *Server) SetAppID(appID string) {
+	srv.appID = appID
+}
+
+func (srv *Server) SetClient(client *Client) {
+	srv.client = client
 }
 
 type Token struct {
@@ -153,6 +183,7 @@ func NewServer(token, aesKey string) *Server {
 		Mel:               mel.New(),
 		messageHandlerMap: make(map[string]Handler),
 		eventHandlerMap:   make(map[string]Handler),
+		SugaredLogger: wechat.Sugar,
 	}
 
 	srv.SetToken(token)
@@ -199,7 +230,13 @@ func NewServer(token, aesKey string) *Server {
 		Encrypt    string `xml:",cdata"`
 	}
 
-	srv.Get("/", func(c *mel.Context) {
+	if srv.urlPrefix != "" {
+		srv.Get("/", func(c *mel.Context) { // health check
+			c.Status(200)
+		})
+	}
+
+	srv.Get(srv.urlPrefix+"/", func(c *mel.Context) {
 		if verifySign(c) {
 			echostr := c.Query("echostr")
 			c.Text(200, echostr)
@@ -219,6 +256,7 @@ func NewServer(token, aesKey string) *Server {
 		}
 
 		ctx := &Context{
+			Client: srv.client,
 			index:    preStartIndex,
 			handlers: append(srv.middlewares, handler),
 			Event:    event,
@@ -229,7 +267,7 @@ func NewServer(token, aesKey string) *Server {
 		return ctx.response
 	}
 
-	srv.Post("/", func(c *mel.Context) {
+	srv.Post(srv.urlPrefix+"/", func(c *mel.Context) {
 		encryptType := c.Query("encrypt_type")
 		signature := c.Query("signature")
 		timestamp := c.Query("timestamp")
@@ -250,7 +288,7 @@ func NewServer(token, aesKey string) *Server {
 				return
 			}
 
-			if srv.userId != "" && !equal(obj.ToUserName, srv.userId) {
+			if srv.ID != "" && !equal(obj.ToUserName, srv.ID) {
 				return
 			}
 
@@ -279,7 +317,7 @@ func NewServer(token, aesKey string) *Server {
 			} else {
 				srv.deleteLastAESKey()
 			}
-			if srv.appId != "" && string(appId) != srv.appId {
+			if srv.appID != "" && string(appId) != srv.appID {
 				return
 			}
 
@@ -322,6 +360,106 @@ func NewServer(token, aesKey string) *Server {
 		default:
 			return
 		}
+	})
+
+	handleAuthorize := func(c *mel.Context, url string, state string) {
+		rep, err := srv.client.Client.Get(url)
+		if err != nil {
+			c.AbortWithError(http.StatusUnauthorized, err)
+			return
+		}
+		defer rep.Body.Close()
+
+		if rep.StatusCode != http.StatusOK {
+			c.AbortWithError(http.StatusUnauthorized, fmt.Errorf("http.Status: %s", rep.Status))
+			return
+		}
+
+		type Result struct {
+			AccessToken string `json:"access_token"`
+			ExpiresIn string `json:"expires_in"`
+			RefreshToken string `json:"refresh_token"`
+			OpenID string `json:"openid"`
+			Scope string `json:"scope"`
+			State string `json:"state,omitempty"`
+		}
+
+		type ResultWithErr struct {
+			Result
+			Err
+		}
+
+		var result ResultWithErr
+		err = json.NewDecoder(rep.Body).Decode(&result)
+		if err != nil {
+			c.AbortWithError(http.StatusUnauthorized, err)
+			return
+		}
+
+		if result.Code() != OK {
+			c.AbortWithError(http.StatusUnauthorized, &result)
+			return
+		}
+
+		result.State = state
+		c.JSON(http.StatusOK, &result.Result)
+	}
+
+	srv.Get(srv.urlPrefix+"/token", func(c *mel.Context) {
+		code := c.Query("code")
+		state := c.Query("state")
+
+		url := fmt.Sprintf("https://api.weixin.qq.com/sns/oauth2/access_token?appid=%s&secret=%s&code=%s&grant_type=authorization_code", srv.client.appId, srv.client.appSecret, code)
+
+		handleAuthorize(c, url, state)
+	})
+
+	srv.Get(srv.urlPrefix+"/refresh-token", func(c *mel.Context) {
+		refreshToken := c.Query("refresh_token")
+
+		url := fmt.Sprintf("https://api.weixin.qq.com/sns/oauth2/refresh_token?appid=%s&grant_type=refresh_token&refresh_token=%s", srv.client.appId, refreshToken)
+
+		handleAuthorize(c, url, "")
+	})
+
+	srv.Get(srv.urlPrefix+"/signature", func(c *mel.Context) {
+		timestamp := c.Query("timestamp")
+		nonceStr := c.Query("nonceStr")
+		url := c.Query("url")
+		refresh := c.Query("refresh")
+
+		var ticket string
+		var err error
+		if refresh != "" && (refresh == "true" || refresh == "True" || refresh == "1") {
+			ticket, err = srv.client.RefreshTicket("")
+		} else {
+			ticket, err = srv.client.Ticket()
+		}
+		if err != nil {
+			c.AbortWithError(http.StatusInternalServerError, err)
+			return
+		}
+
+		strs := sort.StringSlice{
+			"timestamp="+timestamp,
+			"nonceStr="+nonceStr,
+			"url="+url,
+			"jsapi_ticket="+ticket,
+		}
+		strs.Sort()
+		h := sha1.New()
+		buf := bufio.NewWriterSize(h, 1024)
+		for i, s := range strs {
+			buf.WriteString(s)
+			if i < len(strs)-1 {
+				buf.WriteByte('&')
+			}
+		}
+		buf.Flush()
+		sign := hex.EncodeToString(h.Sum(nil))
+		c.JSON(http.StatusOK, map[string]string{
+			"signature": sign,
+		})
 	})
 
 	return srv

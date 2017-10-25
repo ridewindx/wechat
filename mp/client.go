@@ -1,4 +1,4 @@
-package public
+package mp
 
 import (
 	"bytes"
@@ -22,9 +22,9 @@ type Client struct {
 	*http.Client
 }
 
-func NewClient(appId, appSecret string) *Client {
+func NewClient(appId, appSecret string, needsTicket bool) *Client {
 	return &Client{
-		TokenAccessor: NewTokenAccessor(appId, appSecret),
+		TokenAccessor: NewTokenAccessor(appId, appSecret, needsTicket),
 		Client: http.DefaultClient,
 	}
 }

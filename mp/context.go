@@ -1,4 +1,4 @@
-package public
+package mp
 
 import (
 	"math"
@@ -10,6 +10,8 @@ const abortIndex int8 = math.MaxInt8 / 2
 type Handler func(*Context)
 
 type Context struct {
+	*Client
+
 	*Event
 
 	response interface{}
