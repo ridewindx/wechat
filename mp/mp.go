@@ -5,9 +5,9 @@ type MP struct {
 	*Client
 }
 
-func New(id, appID, appSecret, token, aesKey string) *MP {
+func New(id, appID, appSecret, token, aesKey string, urlPrefix ...string) *MP {
 	client := NewClient(appID, appSecret, true)
-	server := NewServer(token, aesKey)
+	server := NewServer(token, aesKey, urlPrefix...)
 	server.SetClient(client)
 	server.SetID(id)
 	server.SetAppID(appID)

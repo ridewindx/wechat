@@ -43,7 +43,7 @@ type Server struct {
 	*zap.SugaredLogger
 }
 
-func (srv *Server) SetURLPrefix(urlPrefix string) {
+func (srv *Server) setURLPrefix(urlPrefix string) {
 	if !strings.HasPrefix(urlPrefix, "/") {
 		urlPrefix = "/" + urlPrefix
 	}
@@ -178,7 +178,7 @@ func (srv *Server) HandleEvent(eventType string, handler Handler) {
 	srv.eventHandlerMap[eventType] = handler
 }
 
-func NewServer(token, aesKey string) *Server {
+func NewServer(token, aesKey string, urlPrefix ...string) *Server {
 	srv := &Server{
 		Mel:               mel.New(),
 		messageHandlerMap: make(map[string]Handler),
@@ -188,6 +188,10 @@ func NewServer(token, aesKey string) *Server {
 
 	srv.SetToken(token)
 	srv.SetAESKey(aesKey)
+
+	if len(urlPrefix) > 0 {
+		srv.setURLPrefix(urlPrefix[0])
+	}
 
 	equal := func(a, b string) bool {
 		return subtle.ConstantTimeCompare([]byte(a), []byte(b)) == 1
