@@ -354,7 +354,11 @@ func NewServer(token, aesKey string, urlPrefix ...string) *Server {
 				Nonce        string
 			}
 
-			c.XML(200, &EncryptRepMsg{encryptedRepStr, repSignature, timestamp, nonce})
+			srv.logger.Info("Reply msg")
+			err = c.XML(200, &EncryptRepMsg{encryptedRepStr, repSignature, timestamp, nonce})
+			if err != nil {
+				srv.logger.Errorw("Reply msg failed", "error", err)
+			}
 
 		case "", "raw":
 			if !verifySign(c) {
