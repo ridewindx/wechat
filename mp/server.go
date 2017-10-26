@@ -40,7 +40,7 @@ type Server struct {
 	messageHandlerMap map[string]Handler
 	eventHandlerMap   map[string]Handler
 
-	*zap.SugaredLogger
+	logger *zap.SugaredLogger
 }
 
 func (srv *Server) setURLPrefix(urlPrefix string) {
@@ -183,7 +183,7 @@ func NewServer(token, aesKey string, urlPrefix ...string) *Server {
 		Mel:               mel.New(),
 		messageHandlerMap: make(map[string]Handler),
 		eventHandlerMap:   make(map[string]Handler),
-		SugaredLogger: wechat.Sugar,
+		logger: wechat.Sugar,
 	}
 
 	srv.SetToken(token)
@@ -279,6 +279,7 @@ func NewServer(token, aesKey string, urlPrefix ...string) *Server {
 		case "aes":
 			token := verifySignReturnToken(signature, timestamp, nonce)
 			if token == "" {
+				srv.logger.Error("Verify sign empty token")
 				return
 			}
 
@@ -287,20 +288,24 @@ func NewServer(token, aesKey string, urlPrefix ...string) *Server {
 			var obj EncryptMsg
 			err := c.BindWith(&obj, binding.XML)
 			if err != nil {
+				srv.logger.Errorw("Bind with XML failed", "error", err)
 				return
 			}
 
 			if srv.ID != "" && !equal(obj.ToUserName, srv.ID) {
+				srv.logger.Errorw("Wechat ID inconsistent", "id", srv.ID, "ToUserName", obj.ToUserName)
 				return
 			}
 
 			computedSign := computeSign(token, timestamp, nonce, obj.Encrypt)
 			if !equal(computedSign, msgSign) {
+				srv.logger.Errorw("Signature inconsistent")
 				return
 			}
 
 			encryptedMsg, err := base64.StdEncoding.DecodeString(obj.Encrypt)
 			if err != nil {
+				srv.logger.Errorw("Decode base64 string failed", "error", err)
 				return
 			}
 
@@ -309,27 +314,32 @@ func NewServer(token, aesKey string, urlPrefix ...string) *Server {
 			random, msg, appId, err := decryptMsg(encryptedMsg, []byte(aesKey))
 			if err != nil {
 				if last == "" {
+					srv.logger.Errorw("Decrypt AES msg failed", "error", err)
 					return
 				}
 				aesKey = last
 				random, msg, appId, err = decryptMsg(encryptedMsg, []byte(aesKey))
 				if err != nil {
+					srv.logger.Errorw("Decrypt AES msg failed", "error", err)
 					return
 				}
 			} else {
 				srv.deleteLastAESKey()
 			}
 			if srv.appID != "" && string(appId) != srv.appID {
+				srv.logger.Errorw("AppID inconsistent", "AppID", appId)
 				return
 			}
 
 			var event Event
 			if err = xml.Unmarshal(msg, &event); err != nil {
+				srv.logger.Errorw("Unmarshal msg failed", "error", err)
 				return
 			}
 
 			repBytes, err := xml.Marshal(handleMessage(&event))
 			if err != nil {
+				srv.logger.Errorw("Marshal msg failed", "error", err)
 				return
 			}
 
