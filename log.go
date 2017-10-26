@@ -10,7 +10,7 @@ func InitLogger(config ...zap.Config) {
 	if len(config) > 1 {
 		conf = config[0]
 	} else {
-		conf := zap.NewDevelopmentConfig()
+		conf = zap.NewDevelopmentConfig()
 		conf.DisableStacktrace = true
 	}
 	var err error
