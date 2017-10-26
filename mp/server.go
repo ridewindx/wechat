@@ -35,7 +35,7 @@ type Server struct {
 	aesKeyMutex sync.Mutex
 	aesKey      unsafe.Pointer
 
-	client *Client
+	client            *Client
 	middlewares       []Handler
 	messageHandlerMap map[string]Handler
 	eventHandlerMap   map[string]Handler
@@ -183,7 +183,7 @@ func NewServer(token, aesKey string, urlPrefix ...string) *Server {
 		Mel:               mel.New(),
 		messageHandlerMap: make(map[string]Handler),
 		eventHandlerMap:   make(map[string]Handler),
-		logger: wechat.Sugar,
+		logger:            wechat.Sugar,
 	}
 
 	srv.SetToken(token)
@@ -230,8 +230,8 @@ func NewServer(token, aesKey string, urlPrefix ...string) *Server {
 	}
 
 	type EncryptMsg struct {
-		ToUserName string `xml:",cdata"`
-		Encrypt    string `xml:",cdata"`
+		ToUserName string `xml:"ToUserName"`
+		Encrypt    string `xml:"Encrypt"`
 	}
 
 	srv.Head("/", func(c *mel.Context) { // health check
@@ -258,7 +258,7 @@ func NewServer(token, aesKey string, urlPrefix ...string) *Server {
 		}
 
 		ctx := &Context{
-			Client: srv.client,
+			Client:   srv.client,
 			index:    preStartIndex,
 			handlers: append(srv.middlewares, handler),
 			Event:    event,
@@ -388,12 +388,12 @@ func NewServer(token, aesKey string, urlPrefix ...string) *Server {
 		}
 
 		type Result struct {
-			AccessToken string `json:"access_token"`
-			ExpiresIn string `json:"expires_in"`
+			AccessToken  string `json:"access_token"`
+			ExpiresIn    string `json:"expires_in"`
 			RefreshToken string `json:"refresh_token"`
-			OpenID string `json:"openid"`
-			Scope string `json:"scope"`
-			State string `json:"state,omitempty"`
+			OpenID       string `json:"openid"`
+			Scope        string `json:"scope"`
+			State        string `json:"state,omitempty"`
 		}
 
 		type ResultWithErr struct {
@@ -453,10 +453,10 @@ func NewServer(token, aesKey string, urlPrefix ...string) *Server {
 		}
 
 		strs := sort.StringSlice{
-			"timestamp="+timestamp,
-			"nonceStr="+nonceStr,
-			"url="+url,
-			"jsapi_ticket="+ticket,
+			"timestamp=" + timestamp,
+			"nonceStr=" + nonceStr,
+			"url=" + url,
+			"jsapi_ticket=" + ticket,
 		}
 		strs.Sort()
 		h := sha1.New()
