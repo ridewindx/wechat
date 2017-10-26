@@ -160,7 +160,23 @@ func (c *Client) CreateMenu(menu *Menu) error {
 	return c.Post(u, menu, &rep)
 }
 
-func (c *Client) GetMenu() (menu *Menu, conditionalMenus []Menu, err error) {
+func (c *Client) CreateConditionalMenu(menu *Menu) (menuID int64, err error) {
+	u := BASE_URL.Join("/menu/addconditional")
+
+	var rep struct {
+		Err
+		MenuID int64 `json:"menuId"`
+	}
+
+	err = c.Post(u, menu, &rep)
+	if err != nil {
+		return
+	}
+	menuID = rep.MenuID
+	return
+}
+
+func (c *Client) GetMenus() (menu *Menu, conditionalMenus []Menu, err error) {
 	u := BASE_URL.Join("/menu/get")
 
 	var rep struct {
@@ -182,4 +198,17 @@ func (c *Client) DeleteMenu() error {
 
 	var rep Err
 	return c.Get(u, &rep)
+}
+
+func (c *Client) DeleteConditionalMenu(menuID *Menu) error {
+	u := BASE_URL.Join("/menu/delconditional")
+
+	var req struct{
+		MenuID int64 `json:"menuId"`
+	}
+
+	var rep Err
+
+	err := c.Post(u, &req, &rep)
+	return err
 }
