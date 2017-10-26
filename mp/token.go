@@ -7,7 +7,6 @@ import (
 	"net/url"
 	"sync/atomic"
 	"time"
-	"github.com/jiudaoyun/wechat"
 )
 
 const (
@@ -74,11 +73,8 @@ func (ta *TokenAccessor) Token() (token string, err error) {
 }
 
 func (ta *TokenAccessor) RefreshToken(usedToken string) (token string, err error) {
-	wechat.Sugar.Infof("refresh token")
 	ta.refreshReq <- refreshData{token: usedToken}
-	wechat.Sugar.Infof("refresh token")
 	rep := <-ta.refreshRep
-	wechat.Sugar.Infof("refresh token")
 	return rep.token, rep.err
 }
 
@@ -117,7 +113,6 @@ LOOP:
 			}
 
 		case req := <-ta.refreshReq:
-			wechat.Sugar.Infof("refresh token")
 			if req.token != "" {
 				token, ok := ta.token.Load().(string)
 				if ok && token != "" && req.token != token {
@@ -132,16 +127,13 @@ LOOP:
 					break
 				}
 			}
-			wechat.Sugar.Infof("refresh token")
 			token, ticket, expiresIn, err := ta.updateToken()
 			if err != nil {
 				ta.refreshRep <- refreshDataResult{err: err}
 				break
 			}
 
-			wechat.Sugar.Infof("refresh token")
 			ta.refreshRep <- refreshDataResult{refreshData: refreshData{token, ticket}}
-			wechat.Sugar.Infof("refresh token")
 
 			tickDuration = time.Duration(expiresIn) * time.Second
 			ticker.Stop()
