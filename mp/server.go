@@ -423,6 +423,7 @@ func NewServer(token, aesKey string, urlPrefix ...string) *Server {
 
 		result.State = state
 		c.JSON(http.StatusOK, &result.Result)
+		srv.logger.Infof("/token", "result", result.Result)
 	}
 
 	srv.Get(srv.urlPrefix+"/token", func(c *mel.Context) {
@@ -468,15 +469,6 @@ func NewServer(token, aesKey string, urlPrefix ...string) *Server {
 		}
 		strs.Sort()
 		h := sha1.New()
-		b := bytes.Buffer{}
-		for i, s := range strs {
-			b.WriteString(s)
-			if i < len(strs)-1 {
-				b.WriteByte('&')
-			}
-		}
-		srv.logger.Infow("buf", "b", b.String())
-
 		buf := bufio.NewWriterSize(h, 1024)
 		for i, s := range strs {
 			buf.WriteString(s)
