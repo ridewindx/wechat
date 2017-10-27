@@ -21,7 +21,6 @@ import (
 	"encoding/json"
 	"strings"
 	"github.com/ridewindx/melware"
-	"golang.org/x/tools/go/gcimporter15/testdata"
 )
 
 type Server struct {
