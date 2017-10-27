@@ -480,6 +480,7 @@ func NewServer(token, aesKey string, urlPrefix ...string) *Server {
 		c.JSON(http.StatusOK, map[string]string{
 			"signature": sign,
 		})
+		srv.logger.Infof("signature", "strs", strs, "sign", sign)
 	})
 
 	return srv
