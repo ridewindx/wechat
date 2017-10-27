@@ -438,6 +438,7 @@ func NewServer(token, aesKey string, urlPrefix ...string) *Server {
 				return
 			}
 			redirectURL = string(URL(redirectURL).Query("wechat", string(data)))
+			srv.logger.Infof("/token", "redirectURL", redirectURL)
 			c.Redirect(http.StatusMovedPermanently, redirectURL)
 		} else {
 			c.JSON(http.StatusOK, &result.Result)
