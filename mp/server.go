@@ -390,19 +390,35 @@ func NewServer(token, aesKey string, urlPrefix ...string) *Server {
 		}
 	})
 
-	handleAuthorize := func(c *mel.Context, url, state, redirectURL string) {
+	authorizeGet := func(c *mel.Context, url string, result interface{}) error {
 		rep, err := srv.client.Client.Get(url)
 		if err != nil {
 			c.AbortWithError(http.StatusUnauthorized, err)
-			return
+			return err
 		}
 		defer rep.Body.Close()
 
 		if rep.StatusCode != http.StatusOK {
 			c.AbortWithError(http.StatusUnauthorized, fmt.Errorf("http.Status: %s", rep.Status))
-			return
+			return err
 		}
 
+		err = json.NewDecoder(rep.Body).Decode(result)
+		if err != nil {
+			c.AbortWithError(http.StatusUnauthorized, err)
+			return err
+		}
+
+		r := result.(Error)
+		if r.Code() != OK {
+			c.AbortWithError(http.StatusUnauthorized, &r)
+			return &r
+		}
+
+		return nil
+	}
+
+	handleAuthorize := func(c *mel.Context, url, state, redirectURL string) {
 		type Result struct {
 			AccessToken  string `json:"access_token"`
 			ExpiresIn    int64 `json:"expires_in"`
@@ -418,20 +434,12 @@ func NewServer(token, aesKey string, urlPrefix ...string) *Server {
 		}
 
 		var result ResultWithErr
-		err = json.NewDecoder(rep.Body).Decode(&result)
+		err := authorizeGet(c, url, &result)
 		if err != nil {
-			c.AbortWithError(http.StatusUnauthorized, err)
-			return
-		}
-
-		if result.Code() != OK {
-			c.AbortWithError(http.StatusUnauthorized, &result)
 			return
 		}
 
 		result.State = state
-		srv.logger.Infof("/token", "result", result.Result)
-		srv.logger.Infof("/token", "redirectURL", redirectURL)
 		if redirectURL != "" {
 			data, err := json.Marshal(&result.Result)
 			if err != nil {
@@ -439,7 +447,6 @@ func NewServer(token, aesKey string, urlPrefix ...string) *Server {
 				return
 			}
 			redirectURL = string(URL(redirectURL).Query("wechat", string(data)))
-			srv.logger.Infof("/token", "redirectURL", redirectURL)
 			c.Redirect(http.StatusMovedPermanently, redirectURL)
 		} else {
 			c.JSON(http.StatusOK, &result.Result)
@@ -463,6 +470,37 @@ func NewServer(token, aesKey string, urlPrefix ...string) *Server {
 		url := fmt.Sprintf("https://api.weixin.qq.com/sns/oauth2/refresh_token?appid=%s&grant_type=refresh_token&refresh_token=%s", srv.client.appId, refreshToken)
 
 		handleAuthorize(c, url, "", "")
+	})
+
+	srv.Get(srv.urlPrefix+"/userinfo", func(c *mel.Context) {
+		token := c.Query("access_token")
+		openID := c.Query("openid")
+
+		url := fmt.Sprintf("https://api.weixin.qq.com/sns/userinfo?access_token=%s&openid=%s&lang=zh_CN", token, openID)
+
+		type Result struct {
+			OpenID       string `json:"openid"`
+			Nickname	string `json:"nickname"`
+			Sex int `json:"sex"`
+			Province string `json:"province"`
+			City string `json:"city"`
+			Country string `json:"country"`
+			HeadImgURL string `json:"headimgurl"`
+			Privilege []string `json:"privilege	"`
+			UnionID string `json:"unionid"`
+		}
+
+		type ResultWithErr struct {
+			Result
+			Err
+		}
+
+		var result ResultWithErr
+		err := authorizeGet(c, url, &result)
+		if err != nil {
+			return
+		}
+		c.JSON(http.StatusOK, &result.Result)
 	})
 
 	srv.Get(srv.urlPrefix+"/signature", func(c *mel.Context) {
