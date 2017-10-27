@@ -431,6 +431,7 @@ func NewServer(token, aesKey string, urlPrefix ...string) *Server {
 
 		result.State = state
 		srv.logger.Infof("/token", "result", result.Result)
+		srv.logger.Infof("/token", "redirectURL", redirectURL)
 		if redirectURL != "" {
 			data, err := json.Marshal(&result.Result)
 			if err != nil {
