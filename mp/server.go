@@ -180,7 +180,7 @@ func (srv *Server) HandleEvent(eventType string, handler Handler) {
 }
 
 func (srv *Server) GetVerifyFile(filename string, content []byte) {
-	srv.Get(srv.urlPrefix+filename, func(c *mel.Context) {
+	srv.Get(srv.urlPrefix+"/"+filename, func(c *mel.Context) {
 		c.Data(200, "text/plain", content)
 	})
 }
