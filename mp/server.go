@@ -406,7 +406,7 @@ func NewServer(token, aesKey string, urlPrefix ...string) *Server {
 
 		type Result struct {
 			AccessToken  string `json:"access_token"`
-			ExpiresIn    string `json:"expires_in"`
+			ExpiresIn    int64 `json:"expires_in"`
 			RefreshToken string `json:"refresh_token"`
 			OpenID       string `json:"openid"`
 			Scope        string `json:"scope"`
