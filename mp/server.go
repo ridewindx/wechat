@@ -444,7 +444,7 @@ func NewServer(token, aesKey string, urlPrefix ...string) *Server {
 
 	srv.Get(srv.urlPrefix+"/signature", func(c *mel.Context) {
 		timestamp := c.Query("timestamp")
-		nonceStr := c.Query("nonceStr")
+		noncestr := c.Query("noncestr")
 		url := c.Query("url")
 		refresh := c.Query("refresh")
 
@@ -462,7 +462,7 @@ func NewServer(token, aesKey string, urlPrefix ...string) *Server {
 
 		strs := sort.StringSlice{
 			"timestamp=" + timestamp,
-			"nonceStr=" + nonceStr,
+			"noncestr=" + noncestr,
 			"url=" + url,
 			"jsapi_ticket=" + ticket,
 		}
