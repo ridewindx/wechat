@@ -235,9 +235,8 @@ func NewServer(token, aesKey string, urlPrefix ...string) *Server {
 		Encrypt    string `xml:"Encrypt"`
 	}
 
-	cors := melware.NewCors()
-	cors.AllowMethods = []string{"GET", "POST", "DELETE", "PUT", "PATCH", "OPTIONS", "HEAD"}
-	cors.AllowHeaders = []string{"Authorization"}
+	cors := melware.CorsAllowAll()
+	cors.AllowCredentials = false
 	srv.Mel.Use(cors.Middleware())
 
 	srv.Head("/", func(c *mel.Context) { // health check
