@@ -436,6 +436,7 @@ func NewServer(token, aesKey string, urlPrefix ...string) *Server {
 	}
 
 	srv.Get(srv.urlPrefix+"/token", func(c *mel.Context) {
+		srv.logger.Infof("url: %s", c.Request.URL.RawQuery)
 		code := c.Query("code")
 		state := c.Query("state")
 
