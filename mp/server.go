@@ -411,8 +411,9 @@ func NewServer(token, aesKey string, urlPrefix ...string) *Server {
 
 		r := result.(Error)
 		if r.Code() != OK {
-			c.AbortWithError(http.StatusUnauthorized, &r)
-			return &r
+			err = r.(error)
+			c.AbortWithError(http.StatusUnauthorized, err)
+			return err
 		}
 
 		return nil
