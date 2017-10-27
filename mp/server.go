@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"encoding/json"
 	"strings"
+	"github.com/ridewindx/melware"
 )
 
 type Server struct {
@@ -233,6 +234,11 @@ func NewServer(token, aesKey string, urlPrefix ...string) *Server {
 		ToUserName string `xml:"ToUserName"`
 		Encrypt    string `xml:"Encrypt"`
 	}
+
+	cors := melware.NewCors()
+	cors.AllowMethods = []string{"GET", "POST", "DELETE", "PUT", "PATCH", "OPTIONS", "HEAD"}
+	cors.AllowHeaders = []string{"*"}
+	srv.Mel.Use(cors.Middleware())
 
 	srv.Head("/", func(c *mel.Context) { // health check
 		c.Status(200)
