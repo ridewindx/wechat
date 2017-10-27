@@ -12,6 +12,7 @@ func InitLogger(config ...zap.Config) {
 	} else {
 		conf = zap.NewDevelopmentConfig()
 		conf.DisableStacktrace = true
+		conf.Level.SetLevel(zap.InfoLevel)
 	}
 	var err error
 	Logger, err = conf.Build()
