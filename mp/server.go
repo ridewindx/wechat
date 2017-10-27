@@ -391,6 +391,7 @@ func NewServer(token, aesKey string, urlPrefix ...string) *Server {
 	})
 
 	handleAuthorize := func(c *mel.Context, url string, state string) {
+		srv.logger.Infof("authorize", "url", url)
 		rep, err := srv.client.Client.Get(url)
 		if err != nil {
 			c.AbortWithError(http.StatusUnauthorized, err)
