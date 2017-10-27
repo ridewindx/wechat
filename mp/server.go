@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"strings"
 	"github.com/ridewindx/melware"
+	"golang.org/x/tools/go/gcimporter15/testdata"
 )
 
 type Server struct {
@@ -390,8 +391,7 @@ func NewServer(token, aesKey string, urlPrefix ...string) *Server {
 		}
 	})
 
-	handleAuthorize := func(c *mel.Context, url string, state string) {
-		srv.logger.Infof("authorize", "url", url)
+	handleAuthorize := func(c *mel.Context, url, state, redirectURL string) {
 		rep, err := srv.client.Client.Get(url)
 		if err != nil {
 			c.AbortWithError(http.StatusUnauthorized, err)
@@ -431,18 +431,28 @@ func NewServer(token, aesKey string, urlPrefix ...string) *Server {
 		}
 
 		result.State = state
-		c.JSON(http.StatusOK, &result.Result)
 		srv.logger.Infof("/token", "result", result.Result)
+		if redirectURL != "" {
+			data, err := json.Marshal(&result.Result)
+			if err != nil {
+				c.AbortWithError(http.StatusUnauthorized, err)
+				return
+			}
+			redirectURL = string(URL(redirectURL).Query("wechat", string(data)))
+			c.Redirect(http.StatusMovedPermanently, redirectURL)
+		} else {
+			c.JSON(http.StatusOK, &result.Result)
+		}
 	}
 
 	srv.Get(srv.urlPrefix+"/token", func(c *mel.Context) {
-		srv.logger.Infof("url: %s", c.Request.URL)
 		code := c.Query("code")
 		state := c.Query("state")
+		redirectURL := c.Query("url")
 
 		url := fmt.Sprintf("https://api.weixin.qq.com/sns/oauth2/access_token?appid=%s&secret=%s&code=%s&grant_type=authorization_code", srv.client.appId, srv.client.appSecret, code)
 
-		handleAuthorize(c, url, state)
+		handleAuthorize(c, url, state, redirectURL)
 	})
 
 	srv.Get(srv.urlPrefix+"/refresh-token", func(c *mel.Context) {
@@ -450,7 +460,7 @@ func NewServer(token, aesKey string, urlPrefix ...string) *Server {
 
 		url := fmt.Sprintf("https://api.weixin.qq.com/sns/oauth2/refresh_token?appid=%s&grant_type=refresh_token&refresh_token=%s", srv.client.appId, refreshToken)
 
-		handleAuthorize(c, url, "")
+		handleAuthorize(c, url, "", "")
 	})
 
 	srv.Get(srv.urlPrefix+"/signature", func(c *mel.Context) {
