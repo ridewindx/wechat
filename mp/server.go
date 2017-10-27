@@ -21,7 +21,6 @@ import (
 	"encoding/json"
 	"strings"
 	"github.com/ridewindx/melware"
-	"path"
 )
 
 type Server struct {
