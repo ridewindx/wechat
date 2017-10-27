@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"strings"
 	"github.com/ridewindx/melware"
+	"path"
 )
 
 type Server struct {
@@ -177,6 +178,12 @@ func (srv *Server) HandleMessage(msgType string, handler Handler) {
 
 func (srv *Server) HandleEvent(eventType string, handler Handler) {
 	srv.eventHandlerMap[eventType] = handler
+}
+
+func (srv *Server) GetVerifyFile(filename string, content []byte) {
+	srv.Get(srv.urlPrefix+filename, func(c *mel.Context) {
+		c.Data(200, "text/plain", content)
+	})
 }
 
 func NewServer(token, aesKey string, urlPrefix ...string) *Server {
