@@ -196,6 +196,12 @@ func NewServer(token, aesKey string, urlPrefix ...string) *Server {
 	srv.SetToken(token)
 	srv.SetAESKey(aesKey)
 
+	srv.Mel.Use(melware.Zap(srv.logger))
+
+	cors := melware.CorsAllowAll()
+	cors.AllowCredentials = false
+	srv.Mel.Use(cors.Middleware())
+
 	if len(urlPrefix) > 0 {
 		srv.setURLPrefix(urlPrefix[0])
 	}
@@ -240,10 +246,6 @@ func NewServer(token, aesKey string, urlPrefix ...string) *Server {
 		ToUserName string `xml:"ToUserName"`
 		Encrypt    string `xml:"Encrypt"`
 	}
-
-	cors := melware.CorsAllowAll()
-	cors.AllowCredentials = false
-	srv.Mel.Use(cors.Middleware())
 
 	srv.Head("/", func(c *mel.Context) { // health check
 		c.Status(200)
