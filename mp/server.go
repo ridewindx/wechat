@@ -447,6 +447,7 @@ func NewServer(token, aesKey string, urlPrefix ...string) *Server {
 	}
 
 	srv.Get(srv.urlPrefix+"/token", func(c *mel.Context) {
+		srv.logger.Infof("/token", "url", c.Request.URL)
 		code := c.Query("code")
 		state := c.Query("state")
 		redirectURL := c.Query("url")
