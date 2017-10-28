@@ -17,8 +17,6 @@ import (
 	"go.uber.org/zap"
 	"github.com/jiudaoyun/wechat"
 	"net/http"
-	"fmt"
-	"encoding/json"
 	"strings"
 	"github.com/ridewindx/melware"
 )
@@ -390,117 +388,43 @@ func NewServer(token, aesKey string, urlPrefix ...string) *Server {
 		}
 	})
 
-	authorizeGet := func(c *mel.Context, url string, result interface{}) error {
-		rep, err := srv.client.Client.Get(url)
-		if err != nil {
-			c.AbortWithError(http.StatusUnauthorized, err)
-			return err
-		}
-		defer rep.Body.Close()
-
-		if rep.StatusCode != http.StatusOK {
-			c.AbortWithError(http.StatusUnauthorized, fmt.Errorf("http.Status: %s", rep.Status))
-			return err
-		}
-
-		err = json.NewDecoder(rep.Body).Decode(result)
-		if err != nil {
-			c.AbortWithError(http.StatusUnauthorized, err)
-			return err
-		}
-
-		r := result.(Error)
-		if r.Code() != OK {
-			err = r.(error)
-			c.AbortWithError(http.StatusUnauthorized, err)
-			return err
-		}
-
-		return nil
-	}
-
-	handleAuthorize := func(c *mel.Context, url, state, redirectURL string) {
-		type Result struct {
-			AccessToken  string `json:"access_token"`
-			ExpiresIn    int64 `json:"expires_in"`
-			RefreshToken string `json:"refresh_token"`
-			OpenID       string `json:"openid"`
-			Scope        string `json:"scope"`
-			State        string `json:"state,omitempty"`
-		}
-
-		type ResultWithErr struct {
-			Result
-			Err
-		}
-
-		var result ResultWithErr
-		err := authorizeGet(c, url, &result)
-		if err != nil {
-			return
-		}
-
-		result.State = state
-		if redirectURL != "" {
-			data, err := json.Marshal(&result.Result)
-			if err != nil {
-				c.AbortWithError(http.StatusUnauthorized, err)
-				return
-			}
-			redirectURL = string(URL(redirectURL).Query("wechat", string(data)))
-			c.Redirect(http.StatusMovedPermanently, redirectURL)
-		} else {
-			c.JSON(http.StatusOK, &result.Result)
-		}
-	}
-
 	srv.Get(srv.urlPrefix+"/token", func(c *mel.Context) {
 		code := c.Query("code")
 		state := c.Query("state")
 		redirectURL := c.Query("url")
 
-		url := fmt.Sprintf("https://api.weixin.qq.com/sns/oauth2/access_token?appid=%s&secret=%s&code=%s&grant_type=authorization_code", srv.client.appId, srv.client.appSecret, code)
+		redirectURL, err := srv.client.Oauth2GetTokenAndRedirect(code, state, redirectURL)
+		if err != nil {
+			c.AbortWithError(http.StatusUnauthorized, err)
+			return
+		}
 
-		handleAuthorize(c, url, state, redirectURL)
+		c.Redirect(http.StatusMovedPermanently, redirectURL)
 	})
 
 	srv.Get(srv.urlPrefix+"/refresh-token", func(c *mel.Context) {
 		refreshToken := c.Query("refresh_token")
 
-		url := fmt.Sprintf("https://api.weixin.qq.com/sns/oauth2/refresh_token?appid=%s&grant_type=refresh_token&refresh_token=%s", srv.client.appId, refreshToken)
+		token, err := srv.client.Oauth2RefreshToken(refreshToken)
+		if err != nil {
+			c.AbortWithError(http.StatusUnauthorized, err)
+			return
+		}
 
-		handleAuthorize(c, url, "", "")
+		c.JSON(http.StatusOK, token)
 	})
 
 	srv.Get(srv.urlPrefix+"/userinfo", func(c *mel.Context) {
 		token := c.Query("access_token")
 		openID := c.Query("openid")
 
-		url := fmt.Sprintf("https://api.weixin.qq.com/sns/userinfo?access_token=%s&openid=%s&lang=zh_CN", token, openID)
-
-		type Result struct {
-			OpenID       string `json:"openid"`
-			Nickname	string `json:"nickname"`
-			Sex int `json:"sex"`
-			Province string `json:"province"`
-			City string `json:"city"`
-			Country string `json:"country"`
-			HeadImgURL string `json:"headimgurl"`
-			Privilege []string `json:"privilege	"`
-			UnionID string `json:"unionid"`
-		}
-
-		type ResultWithErr struct {
-			Result
-			Err
-		}
-
-		var result ResultWithErr
-		err := authorizeGet(c, url, &result)
+		user, err := srv.client.Oauth2GetUser(token, openID)
 		if err != nil {
+			c.AbortWithError(http.StatusUnauthorized, err)
 			return
 		}
-		c.JSON(http.StatusOK, &result.Result)
+
+		c.JSON(http.StatusOK, user)
 	})
 
 	srv.Get(srv.urlPrefix+"/signature", func(c *mel.Context) {

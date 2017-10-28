@@ -58,7 +58,7 @@ const (
 
 type User struct {
 	IsSubscriber  int    `json:"subscribe"` // 0 represents not a subscriber and the following infos do not exist
-	OpenId        string `json:"openid"`
+	OpenID        string `json:"openid"`
 	Nickname      string `json:"nickname"`
 	Sex           int    `json:"sex"`      // 1: male, 2: female, 3: unknown
 	Language      string `json:"language"` // zh_CN, zh_TW, en
@@ -67,9 +67,9 @@ type User struct {
 	Country       string `json:"country"`
 	HeadImageURL  string `json:"headimgurl"`
 	SubscribeTime int64  `json:"subscribe_time"`
-	UnionId       string `json:"unionid,omitempty"` // exists only when the WeChat public account has been bound to WeChat open platform account
+	UnionID       string `json:"unionid,omitempty"` // exists only when the WeChat public account has been bound to WeChat open platform account
 	Remark        string `json:"remark"`
-	GroupId       int  `json:"groupid"`
+	GroupID       int    `json:"groupid"`
 }
 
 func (c *Client) GetUser(openId string, lang ...string) (*User, error) {
