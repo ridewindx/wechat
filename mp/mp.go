@@ -3,7 +3,7 @@ package mp
 type MP struct {
 	*Server
 	*Client
-	MPClient *Client
+	CorpClient *Client
 }
 
 func New(id, appID, appSecret, token, aesKey string, urlPrefix ...string) *MP {
