@@ -58,18 +58,26 @@ type Oauth2Token struct {
 }
 
 func (c *Client) Oauth2GetTokenAndRedirect(code, state, redirectURL string) (string, error) {
-	url := fmt.Sprintf("https://api.weixin.qq.com/sns/oauth2/access_token?appid=%s&secret=%s&code=%s&grant_type=authorization_code", c.appId, c.appSecret, code)
-
-	token, err := oauth2GetToken(c.Client, url, state)
+	token, err := c.Oauth2GetToken(code, state)
 	if err != nil {
 		return "", err
 	}
+	return c.Oauth2Redirect(token, redirectURL)
+}
+
+func (c *Client) Oauth2Redirect(token *Oauth2Token, redirectURL string) (string, error) {
 	data, err := json.Marshal(token)
 	if err != nil {
 		return "", err
 	}
 	redirectURL = string(URL(redirectURL).Query("wechat", string(data)))
 	return redirectURL, nil
+}
+
+func (c *Client) Oauth2GetToken(code, state string) (*Oauth2Token, error) {
+	url := fmt.Sprintf("https://api.weixin.qq.com/sns/oauth2/access_token?appid=%s&secret=%s&code=%s&grant_type=authorization_code", c.appId, c.appSecret, code)
+
+	return oauth2GetToken(c.Client, url, state)
 }
 
 func (c *Client) Oauth2RefreshToken(refreshToken string) (*Oauth2Token, error) {
