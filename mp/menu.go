@@ -212,3 +212,10 @@ func (c *Client) DeleteConditionalMenu(menuID *Menu) error {
 	err := c.Post(u, &req, &rep)
 	return err
 }
+
+func (c *Client) CreateCorpMenu(menu *Menu) error {
+	u := CORP_BASE_URL.Join("/menu/create")
+
+	var rep Err
+	return c.Post(c.urlAddAgentID(u), menu, &rep)
+}

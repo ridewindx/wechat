@@ -13,9 +13,11 @@ import (
 	"path/filepath"
 	"strings"
 	"fmt"
+	"strconv"
 )
 
 var BASE_URL URL = "https://api.weixin.qq.com/cgi-bin"
+var CORP_BASE_URL URL = "https://qyapi.weixin.qq.com/cgi-bin"
 
 type Client struct {
 	*TokenAccessor
@@ -37,6 +39,10 @@ func NewCorpClient(corpID, secret string, agentID int64) *Client {
 		Client: http.DefaultClient,
 		AgentID: agentID,
 	}
+}
+
+func (c *Client) urlAddAgentID(u URL) URL {
+	return u.Query("agentid", strconv.FormatInt(c.AgentID, 10))
 }
 
 func (c *Client) call(u URL, rep interface{}, streamRep io.Writer, request func(URL) (*http.Response, error)) error {
