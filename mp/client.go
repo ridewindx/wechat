@@ -20,12 +20,22 @@ var BASE_URL URL = "https://api.weixin.qq.com/cgi-bin"
 type Client struct {
 	*TokenAccessor
 	*http.Client
+
+	AgentID int64 // corp app ID
 }
 
-func NewClient(appId, appSecret string, needsTicket bool) *Client {
+func NewClient(appID, appSecret string, needsTicket bool) *Client {
 	return &Client{
-		TokenAccessor: NewTokenAccessor(appId, appSecret, needsTicket),
+		TokenAccessor: NewTokenAccessor(appID, appSecret, needsTicket),
 		Client: http.DefaultClient,
+	}
+}
+
+func NewCorpClient(corpID, secret string, agentID int64) *Client {
+	return &Client{
+		TokenAccessor: NewCorpTokenAccessor(corpID, secret),
+		Client: http.DefaultClient,
+		AgentID: agentID,
 	}
 }
 

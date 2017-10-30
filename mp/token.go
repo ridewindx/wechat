@@ -12,6 +12,7 @@ import (
 const (
 	wechatTokenUrl   = "https://api.weixin.qq.com/cgi-bin/token?grant_type=client_credential&appid=%s&secret=%s"
 	wechatTicketUrl  = "https://api.weixin.qq.com/cgi-bin/ticket/getticket?access_token=%s&type=jsapi"
+	wechatCorpTokenUrl   = "https://qyapi.weixin.qq.com/cgi-bin/gettoken?corpid=%s&corpsecret=%s"
 	validityDuration = time.Duration(7200) * time.Second
 )
 
@@ -26,7 +27,7 @@ type refreshDataResult struct {
 }
 
 type TokenAccessor struct {
-	appId     string
+	appID     string
 	appSecret string
 
 	needsTicket bool
@@ -43,14 +44,21 @@ type TokenAccessor struct {
 
 func NewTokenAccessor(appId, appSecret string, needsTicket bool) (ta *TokenAccessor) {
 	ta = &TokenAccessor{
-		appId:      url.QueryEscape(appId),
-		appSecret:  url.QueryEscape(appSecret),
+		appID:       url.QueryEscape(appId),
+		appSecret:   url.QueryEscape(appSecret),
 		needsTicket: needsTicket,
-		refreshReq: make(chan refreshData),
-		refreshRep: make(chan refreshDataResult),
-		done:       make(chan struct{}),
+		refreshReq:  make(chan refreshData),
+		refreshRep:  make(chan refreshDataResult),
+		done:        make(chan struct{}),
 	}
-	ta.url = fmt.Sprintf(wechatTokenUrl, ta.appId, ta.appSecret)
+	ta.url = fmt.Sprintf(wechatTokenUrl, ta.appID, ta.appSecret)
+	return
+}
+
+
+func NewCorpTokenAccessor(corpID, corpSecret string) (ta *TokenAccessor) {
+	ta = NewTokenAccessor(corpID, corpSecret, false)
+	ta.url = fmt.Sprintf(wechatCorpTokenUrl, ta.appID, ta.appSecret)
 	return
 }
 

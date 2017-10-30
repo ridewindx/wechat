@@ -75,13 +75,13 @@ func (c *Client) Oauth2Redirect(token *Oauth2Token, redirectURL string) (string,
 }
 
 func (c *Client) Oauth2GetToken(code, state string) (*Oauth2Token, error) {
-	url := fmt.Sprintf("https://api.weixin.qq.com/sns/oauth2/access_token?appid=%s&secret=%s&code=%s&grant_type=authorization_code", c.appId, c.appSecret, code)
+	url := fmt.Sprintf("https://api.weixin.qq.com/sns/oauth2/access_token?appid=%s&secret=%s&code=%s&grant_type=authorization_code", c.appID, c.appSecret, code)
 
 	return oauth2GetToken(c.Client, url, state)
 }
 
 func (c *Client) Oauth2RefreshToken(refreshToken string) (*Oauth2Token, error) {
-	url := fmt.Sprintf("https://api.weixin.qq.com/sns/oauth2/refresh_token?appid=%s&grant_type=refresh_token&refresh_token=%s", c.appId, refreshToken)
+	url := fmt.Sprintf("https://api.weixin.qq.com/sns/oauth2/refresh_token?appid=%s&grant_type=refresh_token&refresh_token=%s", c.appID, refreshToken)
 
 	return oauth2GetToken(c.Client, url, "")
 }

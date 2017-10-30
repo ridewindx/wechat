@@ -33,3 +33,14 @@ func (err *Err) Code() int {
 func (err *Err) Msg() string {
     return err.ErrMsg
 }
+
+type CorpErr struct {
+    Err
+    InvalidUSer string `json:"invaliduser"`
+    InvalidParty string `json:"invalidparty"`
+    InvalidTag string `json:"invalidtag"`
+}
+
+func (err *CorpErr) Error() string {
+    return fmt.Sprintf("errcode: %d, errmsg: %s, invalid: %s, %s, %s", err.ErrCode, err.ErrMsg, err.InvalidUSer, err.InvalidParty, err.InvalidTag)
+}
