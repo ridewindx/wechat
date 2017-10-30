@@ -29,7 +29,7 @@ func (ctx *Context) ReplyTransferToAgent(agentAccount ...string) {
 
 // Customer Service Agent
 type Agent struct {
-	Id           string `json:"kf_id"`
+	Id           int64 `json:"kf_id"`
 	Account      string `json:"kf_account"` // identifier@account
 	Nickname     string `json:"kf_nick"`
 	HeadImageURL string `json:"kf_headimgurl"`
@@ -37,7 +37,7 @@ type Agent struct {
 
 // Online Customer Service Agent
 type OnlineAgent struct {
-	Id                string `json:"kf_id"`
+	Id                int64 `json:"kf_id"`
 	Account           string `json:"kf_account"`    // identifier@account
 	Status            int    `json:"status"`        // 1: PC Online, 2: Mobile Online, 3: PC and Mobile Online
 	AutoAcceptNum     int    `json:"auto_accept"`   // maximum number of auto accepting
