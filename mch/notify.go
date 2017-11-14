@@ -49,15 +49,19 @@ func NewNotifyHandler(appID, mchID, apiKey string, handler ...func(*NotifyMsg) e
 	}
 }
 
-func (nm *NotifyHandler) serveError(w io.Writer, reason string) {
-	nm.Errorw("NotifyHandler serve error", "error", reason)
+func (nm *NotifyHandler) reply(w io.Writer, code, reason string) {
 	err := EncodeXML(w, map[string]string{
-		"return_code": ReturnCodeFail,
+		"return_code": code,
 		"return_msg":  reason,
 	})
 	if err != nil {
 		nm.Errorw("NotifyHandler write XML failed", "error", err)
 	}
+}
+
+func (nm *NotifyHandler) replyError(w io.Writer, reason string) {
+	nm.Errorw("NotifyHandler reply error", "error", reason)
+	nm.reply(w, ReturnCodeFail, reason)
 }
 
 func (nm *NotifyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -66,13 +70,13 @@ func (nm *NotifyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (nm *NotifyHandler) Serve(w io.Writer, r *http.Request, handler func(*NotifyMsg) error) {
 	if r.Method != "POST" {
-		nm.serveError(w, "unexpected HTTP Method: "+r.Method)
+		nm.replyError(w, "unexpected HTTP Method: "+r.Method)
 		return
 	}
 
 	req, err := DecodeXML(r.Body)
 	if err != nil {
-		nm.serveError(w, err.Error())
+		nm.replyError(w, err.Error())
 		return
 	}
 
@@ -84,7 +88,7 @@ func (nm *NotifyHandler) Serve(w io.Writer, r *http.Request, handler func(*Notif
 			ReturnCode: returnCode,
 			ReturnMsg:  req["return_msg"],
 		}
-		nm.serveError(w, err.Error())
+		nm.replyError(w, err.Error())
 		return
 	}
 
@@ -95,7 +99,7 @@ func (nm *NotifyHandler) Serve(w io.Writer, r *http.Request, handler func(*Notif
 			ErrCode:     req["err_code"],
 			ErrCodeDesc: req["err_code_des"],
 		}
-		nm.serveError(w, err.Error())
+		nm.replyError(w, err.Error())
 		return
 	}
 
@@ -103,7 +107,7 @@ func (nm *NotifyHandler) Serve(w io.Writer, r *http.Request, handler func(*Notif
 		wantAppId := nm.appID
 		haveAppId := req["appid"]
 		if !wechat.Compare(haveAppId, wantAppId) {
-			nm.serveError(w, fmt.Sprintf("appid mismatch, have: %s, want: %s", haveAppId, wantAppId))
+			nm.replyError(w, fmt.Sprintf("appid mismatch, have: %s, want: %s", haveAppId, wantAppId))
 			return
 		}
 	}
@@ -111,7 +115,7 @@ func (nm *NotifyHandler) Serve(w io.Writer, r *http.Request, handler func(*Notif
 		wantMchId := nm.mchID
 		haveMchId := req["mch_id"]
 		if !wechat.Compare(haveMchId, wantMchId) {
-			nm.serveError(w, fmt.Sprintf("mch_id mismatch, have: %s, want: %s", haveMchId, wantMchId))
+			nm.replyError(w, fmt.Sprintf("mch_id mismatch, have: %s, want: %s", haveMchId, wantMchId))
 			return
 		}
 	}
@@ -120,7 +124,7 @@ func (nm *NotifyHandler) Serve(w io.Writer, r *http.Request, handler func(*Notif
 		wantSubAppId := nm.subAppID
 		haveSubAppId := req["sub_appid"]
 		if haveSubAppId != "" && !wechat.Compare(haveSubAppId, wantSubAppId) {
-			nm.serveError(w, fmt.Sprintf("sub_appid mismatch, have: %s, want: %s", haveSubAppId, wantSubAppId))
+			nm.replyError(w, fmt.Sprintf("sub_appid mismatch, have: %s, want: %s", haveSubAppId, wantSubAppId))
 			return
 		}
 	}
@@ -128,7 +132,7 @@ func (nm *NotifyHandler) Serve(w io.Writer, r *http.Request, handler func(*Notif
 		wantSubMchId := nm.subMchID
 		haveSubMchId := req["sub_mch_id"]
 		if !wechat.Compare(haveSubMchId, wantSubMchId) {
-			nm.serveError(w, fmt.Sprintf("sub_mch_id mismatch, have: %s, want: %s", haveSubMchId, wantSubMchId))
+			nm.replyError(w, fmt.Sprintf("sub_mch_id mismatch, have: %s, want: %s", haveSubMchId, wantSubMchId))
 			return
 		}
 	}
@@ -141,17 +145,17 @@ func (nm *NotifyHandler) Serve(w io.Writer, r *http.Request, handler func(*Notif
 	case SignTypeHMAC_SHA256:
 		wantSign = Sign(req, nm.apiKey, hmac.New(sha256.New, []byte(nm.apiKey)))
 	default:
-		nm.serveError(w, fmt.Sprintf("unsupported notification sign_type: %s", signType))
+		nm.replyError(w, fmt.Sprintf("unsupported notification sign_type: %s", signType))
 		return
 	}
 	if !wechat.Compare(haveSign, wantSign) {
-		nm.serveError(w, fmt.Sprintf("sign mismatch,\nhave: %s,\nwant: %s", haveSign, wantSign))
+		nm.replyError(w, fmt.Sprintf("sign mismatch,\nhave: %s,\nwant: %s", haveSign, wantSign))
 		return
 	}
 
 	orderInfo, err := getOrderInfo(req)
 	if err != nil {
-		nm.serveError(w, err.Error())
+		nm.replyError(w, err.Error())
 	}
 
 	msg := NotifyMsg{
@@ -163,13 +167,8 @@ func (nm *NotifyHandler) Serve(w io.Writer, r *http.Request, handler func(*Notif
 	}
 	err = handler(&msg)
 	if err != nil {
-		nm.serveError(w, err.Error())
+		nm.replyError(w, err.Error())
 	}
 
-	err = EncodeXML(w, map[string]string{
-		"return_code": ReturnCodeSuccess,
-	})
-	if err != nil {
-		nm.Errorw("NotifyHandler write XML failed", "error", err)
-	}
+	nm.reply(w, ReturnCodeSuccess, "OK")
 }
