@@ -12,6 +12,8 @@ import (
 	"strings"
 	"io"
 	"crypto/tls"
+	"go.uber.org/zap"
+	"github.com/jiudaoyun/wechat"
 )
 
 const API_URL = "https://api.mch.weixin.qq.com"
@@ -28,6 +30,8 @@ type Client struct {
 
 	client    *http.Client
 	tlsClient *http.Client
+
+	*zap.SugaredLogger
 }
 
 func New(appID, mchID, apiKey string, timeout ...time.Duration) *Client {
@@ -35,6 +39,8 @@ func New(appID, mchID, apiKey string, timeout ...time.Duration) *Client {
 		appID:  appID,
 		mchID:  mchID,
 		apiKey: apiKey,
+
+		SugaredLogger: wechat.Sugar,
 	}
 	if len(timeout) > 0 {
 		client.client = &http.Client{
