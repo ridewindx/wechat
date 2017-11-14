@@ -45,17 +45,24 @@ func getOrderInfo(req map[string]string) (*OrderInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	settlementTotalFee, err := strconv.Atoi(req["settlement_total_fee"])
-	if err != nil {
-		return nil, err
+	var settlementTotalFee, couponFee, couponCount int
+	if req["settlement_total_fee"] != "" {
+		settlementTotalFee, err = strconv.Atoi(req["settlement_total_fee"])
+		if err != nil {
+			return nil, err
+		}
 	}
-	couponFee, err := strconv.Atoi(req["coupon_fee"])
-	if err != nil {
-		return nil, err
+	if req["coupon_fee"] != "" {
+		couponFee, err = strconv.Atoi(req["coupon_fee"])
+		if err != nil {
+			return nil, err
+		}
 	}
-	couponCount, err := strconv.Atoi(req["coupon_count"])
-	if err != nil {
-		return nil, err
+	if req["coupon_count"] != "" {
+		couponCount, err = strconv.Atoi(req["coupon_count"])
+		if err != nil {
+			return nil, err
+		}
 	}
 	timeEnd, err := ParseTime(req["time_end"])
 	if err != nil {
