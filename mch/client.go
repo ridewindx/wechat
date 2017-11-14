@@ -57,6 +57,8 @@ func NewWithSubMch(appID, mchID, apiKey, subAppID, subMchID string, timeout ...t
 		apiKey:   apiKey,
 		subAppID: subAppID,
 		subMchID: subMchID,
+
+		SugaredLogger: wechat.Sugar,
 	}
 	if len(timeout) > 0 {
 		client.client = &http.Client{
@@ -196,12 +198,6 @@ func (client *Client) toMap(repBody io.Reader) (rep map[string]string, err error
 		defer closer.Close()
 	}
 
-	defer func() {
-		if err != nil {
-			client.Infof("QueryOrder err: %s", err)
-		}
-		client.Infof("QueryOrder response map: %s", len(rep))
-	}()
 	rep, err = DecodeXML(repBody)
 	if err != nil {
 		return nil, err
