@@ -9,6 +9,7 @@ import (
 	"go.uber.org/zap"
 	"github.com/jiudaoyun/wechat"
 	"io"
+	"gitee.com/jiudaoyun/shefuren/api"
 )
 
 type NotifyMsg struct {
@@ -75,6 +76,8 @@ func (nm *NotifyHandler) Serve(w io.Writer, r *http.Request, handler func(*Notif
 		nm.serveError(w, err.Error())
 		return
 	}
+
+	api.Sugar.Infof("wechat callback: %s", req)
 
 	returnCode := req["return_code"]
 	if returnCode != ReturnCodeSuccess {
