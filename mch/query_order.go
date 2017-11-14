@@ -111,6 +111,7 @@ func (client *Client) QueryOrder(req *QueryOrderRequest) (rep *QueryOrderRespons
 
 	repMap, err := client.PostXML("/pay/orderquery", reqMap)
 	if err != nil {
+		client.Errorf("QueryOrder error: %s", err)
 		return nil, err
 	}
 	client.Infof("QueryOrder response map: %s", repMap)
