@@ -110,6 +110,9 @@ func (client *Client) QueryOrder(req *QueryOrderRequest) (rep *QueryOrderRespons
 	}
 
 	repMap, err := client.PostXML("/pay/orderquery", reqMap)
+	if err != nil {
+		return nil, err
+	}
 	client.Infof("QueryOrder response map: %s", repMap)
 
 	tradeState := TradeState(repMap["trade_state"])
