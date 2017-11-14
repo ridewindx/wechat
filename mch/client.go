@@ -200,7 +200,7 @@ func (client *Client) toMap(repBody io.Reader) (rep map[string]string, err error
 		if err != nil {
 			client.Infof("QueryOrder err: %s", err)
 		}
-		client.Infof("QueryOrder response map: %s", rep)
+		client.Infof("QueryOrder response map: %s", len(rep))
 	}()
 	rep, err = DecodeXML(repBody)
 	if err != nil {
