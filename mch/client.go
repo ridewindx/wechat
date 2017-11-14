@@ -172,9 +172,6 @@ func (client *Client) postToMap(withCert bool, url string, body io.Reader) (rep 
 		return nil, err
 	}
 	defer repBody.Close()
-	defer func() {
-		client.Infof("QueryOrder response map: %s", rep)
-	}()
 	return client.toMap(repBody)
 }
 
@@ -199,6 +196,12 @@ func (client *Client) toMap(repBody io.Reader) (rep map[string]string, err error
 		defer closer.Close()
 	}
 
+	defer func() {
+		if err != nil {
+			client.Infof("QueryOrder err: %s", err)
+		}
+		client.Infof("QueryOrder response map: %s", rep)
+	}()
 	rep, err = DecodeXML(repBody)
 	if err != nil {
 		return nil, err
