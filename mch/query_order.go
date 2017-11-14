@@ -117,7 +117,7 @@ func (client *Client) QueryOrder(req *QueryOrderRequest) (rep *QueryOrderRespons
 		return rep, nil
 	}
 
-	orderInfo, err := getOrderInfo(reqMap)
+	orderInfo, err := getOrderInfo(repMap)
 	if err != nil {
 		return nil, err
 	}
