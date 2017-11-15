@@ -50,7 +50,7 @@ func Sign(params map[string]string, apiKey string, h hash.Hash) string {
 	return string(bytes.ToUpper(signature))
 }
 
-func JsapiSign(appId, timeStamp, nonceStr, packageStr, signType string, apiKey string) string {
+func JSAPISign(appId, timeStamp, nonceStr, packageStr, signType string, apiKey string) string {
 	var h hash.Hash
 	switch signType {
 	case SignTypeMD5:
