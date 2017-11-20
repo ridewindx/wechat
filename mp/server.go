@@ -399,7 +399,7 @@ func NewServer(token, aesKey string, urlPrefix ...string) *Server {
 			return
 		}
 
-		srv.logger.Errorf("redirectURL: %s", redirectURL)
+		srv.logger.Infof("redirectURL: %s", redirectURL)
 
 		c.Redirect(http.StatusMovedPermanently, redirectURL)
 	})
