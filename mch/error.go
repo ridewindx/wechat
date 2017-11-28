@@ -62,4 +62,13 @@ const (
 	ErrCodeTRADE_OVERDUE = "TRADE_OVERDUE" // 订单已经超过可退款的最大期限(支付后一年内可退款)
 	ErrCodeINVALID_TRANSACTIONID = "INVALID_TRANSACTIONID" // 检查原交易号是否存在或发起支付交易接口返回失败
 	ErrCodePARAM_ERROR = "PARAM_ERROR"
+
+	ErrCodeNO_AUTH = "NO_AUTH" // 没有授权请求此api
+	ErrCodeAMOUNT_LIMIT = "AMOUNT_LIMIT" // 付款金额不能小于最低限额	每次付款金额必须大于1元
+	ErrCodeOPENID_ERROR = "OPENID_ERROR" // Openid格式错误或者不属于商家公众账号
+	ErrCodeSEND_FAILED = "SEND_FAILED" // 付款失败，请换单号重试
+	ErrCodeNAME_MISMATCH = "NAME_MISMATCH" // 请求参数里填写了需要检验姓名，但是输入了错误的姓名
+	ErrCodeFREQ_LIMIT = "FREQ_LIMIT" // 接口请求频率超时接口限制
+	ErrCodeMONEY_LIMIT = "MONEY_LIMIT" // 已经达到今日付款总额上限/已达到付款给此用户额度上限
+	ErrCodeV2_ACCOUNT_SIMPLE_BAN = "V2_ACCOUNT_SIMPLE_BAN" // 无法给非实名用户付款
 )
