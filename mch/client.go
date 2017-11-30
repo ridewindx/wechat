@@ -141,7 +141,9 @@ func (client *Client) postXML(withCert bool, relativeURL string, req map[string]
 }
 
 func (client *Client) makeRequest(req map[string]string) (*bytes.Buffer, error) {
-	if _, ok := req["mch_appid"]; !ok {
+	_, isEnterprisePay := req["mch_appid"]
+
+	if !isEnterprisePay {
 		req["appid"] = client.appID
 		req["mch_id"] = client.mchID
 	}
@@ -156,12 +158,17 @@ func (client *Client) makeRequest(req map[string]string) (*bytes.Buffer, error) 
 
 	switch client.signType {
 	case "", SignTypeMD5:
-		req["sign_type"] = SignTypeMD5
+		if !isEnterprisePay {
+			req["sign_type"] = SignTypeMD5
+		}
 		req["sign"] = Sign(req, client.apiKey, md5.New())
 	case SignTypeHMAC_SHA256:
-		req["sign_type"] = SignTypeHMAC_SHA256
+		if !isEnterprisePay {
+			req["sign_type"] = SignTypeHMAC_SHA256
+		}
 		req["sign"] = Sign(req, client.apiKey, hmac.New(sha256.New, []byte(client.apiKey)))
 	}
+	fmt.Printf("req: %v\n", req)
 
 	buffer := pool.Get().(*bytes.Buffer)
 	buffer.Reset()
