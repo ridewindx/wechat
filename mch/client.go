@@ -231,11 +231,14 @@ func (client *Client) toMap(repBody io.Reader) (rep map[string]string, err error
 	}
 
 	appId := rep["appid"]
-	if appId != client.appID {
+	if appId != "" && appId != client.appID {
 		return nil, fmt.Errorf("appid mismatch, have: %s, want: %s", appId, client.appID)
 	}
 	mchId := rep["mch_id"]
-	if mchId != client.mchID {
+	if mchId == "" {
+		mchId = rep["mchid"]
+	}
+	if mchId != "" && mchId != client.mchID {
 		return nil, fmt.Errorf("mch_id mismatch, have: %s, want: %s", mchId, client.mchID)
 	}
 
