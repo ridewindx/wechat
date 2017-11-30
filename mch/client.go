@@ -121,28 +121,28 @@ func (client *Client) PostXMLWithCert(relativeURL string, req map[string]string)
 }
 
 func (client *Client) postXML(withCert bool, relativeURL string, req map[string]string) (rep map[string]string, err error) {
-	buffer, err := client.makeRequest(req)
+	_, isEnterprisePay := req["mch_appid"]
+
+	buffer, err := client.makeRequest(req, isEnterprisePay)
 	defer pool.Put(buffer)
 	if err != nil {
 		return nil, err
 	}
 
 	url := API_URL + relativeURL
-	rep, err = client.postToMap(withCert, url, buffer)
+	rep, err = client.postToMap(withCert, url, buffer, isEnterprisePay)
 	if err != nil {
 		bizError, ok := err.(*BizError)
 		if !ok || bizError.ErrCode != ErrCodeSYSTEMERROR {
 			return
 		}
 		url = switchReqURL(url)
-		return client.postToMap(withCert, url, buffer) // retry
+		return client.postToMap(withCert, url, buffer, isEnterprisePay) // retry
 	}
 	return
 }
 
-func (client *Client) makeRequest(req map[string]string) (*bytes.Buffer, error) {
-	_, isEnterprisePay := req["mch_appid"]
-
+func (client *Client) makeRequest(req map[string]string, isEnterprisePay bool) (*bytes.Buffer, error) {
 	if !isEnterprisePay {
 		req["appid"] = client.appID
 		req["mch_id"] = client.mchID
@@ -177,13 +177,13 @@ func (client *Client) makeRequest(req map[string]string) (*bytes.Buffer, error) 
 	return buffer, err
 }
 
-func (client *Client) postToMap(withCert bool, url string, body io.Reader) (rep map[string]string, err error) {
+func (client *Client) postToMap(withCert bool, url string, body io.Reader, isEnterprisePay bool) (rep map[string]string, err error) {
 	repBody, err := client.post(withCert, url, body)
 	if err != nil {
 		return nil, err
 	}
 	defer repBody.Close()
-	return client.toMap(repBody)
+	return client.toMap(repBody, isEnterprisePay)
 }
 
 func (client *Client) post(withCert bool, url string, body io.Reader) (io.ReadCloser, error) {
@@ -202,7 +202,7 @@ func (client *Client) post(withCert bool, url string, body io.Reader) (io.ReadCl
 	return rep.Body, nil
 }
 
-func (client *Client) toMap(repBody io.Reader) (rep map[string]string, err error) {
+func (client *Client) toMap(repBody io.Reader, isEnterprisePay bool) (rep map[string]string, err error) {
 	if closer, ok := repBody.(io.Closer); ok {
 		defer closer.Close()
 	}
@@ -236,7 +236,7 @@ func (client *Client) toMap(repBody io.Reader) (rep map[string]string, err error
 	}
 	mchId := rep["mch_id"]
 	if mchId == "" {
-		mchId = rep["mchid"]
+		mchId, _ = rep["mchid"]
 	}
 	if mchId != "" && mchId != client.mchID {
 		return nil, fmt.Errorf("mch_id mismatch, have: %s, want: %s", mchId, client.mchID)
@@ -251,6 +251,10 @@ func (client *Client) toMap(repBody io.Reader) (rep map[string]string, err error
 		if subMchId != client.subMchID {
 			return nil, fmt.Errorf("sub_mch_id mismatch, have: %s, want: %s", subMchId, client.subMchID)
 		}
+	}
+
+	if isEnterprisePay { // enterprise payment response has no sign
+		return rep, nil
 	}
 
 	var signWant string
