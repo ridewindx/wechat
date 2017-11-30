@@ -141,8 +141,10 @@ func (client *Client) postXML(withCert bool, relativeURL string, req map[string]
 }
 
 func (client *Client) makeRequest(req map[string]string) (*bytes.Buffer, error) {
-	req["appid"] = client.appID
-	req["mch_id"] = client.mchID
+	if _, ok := req["mch_appid"]; !ok {
+		req["appid"] = client.appID
+		req["mch_id"] = client.mchID
+	}
 	if client.subAppID != "" {
 		req["sub_appid"] = client.subAppID
 	}
