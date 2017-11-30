@@ -202,6 +202,7 @@ func (client *Client) toMap(repBody io.Reader) (rep map[string]string, err error
 	if err != nil {
 		return nil, err
 	}
+	fmt.Printf("toMap rep: %v\n", rep)
 
 	returnCode := rep["return_code"]
 	if returnCode != ReturnCodeSuccess {
