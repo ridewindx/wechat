@@ -53,7 +53,7 @@ func (client *Client) DownloadBillToWriter(req *DownloadBillRequest, writer io.W
 		reqMap["tar_type"] = "GZIP"
 	}
 
-	buffer, err := client.makeRequest(reqMap)
+	buffer, err := client.makeRequest(reqMap, false)
 	defer pool.Put(buffer)
 	if err != nil {
 		return err
@@ -98,7 +98,7 @@ func (client *Client) postToWriter(url string, body io.Reader, writer io.Writer)
 			return unicode.IsSpace(r)
 		})
 		if bytes.HasPrefix(bs, []byte("<xml>")) {
-			_, err = client.toMap(bytes.NewReader(bs))
+			_, err = client.toMap(bytes.NewReader(bs), false)
 			if err != nil {
 				return 0, err
 			}
