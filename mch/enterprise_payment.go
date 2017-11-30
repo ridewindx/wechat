@@ -42,6 +42,9 @@ func (client *Client) EnterprisePay(req *EnterprisePayRequst) (*EnterprisePayRes
 		reqMap["device_info"] = req.DeviceInfo
 	}
 
+	reqMap["mch_appid"] = client.appID
+	reqMap["mchid"] = client.mchID
+
 	repMap, err := client.PostXML("/mmpaymkttransfers/promotion/transfers", reqMap)
 	if err != nil {
 		return nil, err
