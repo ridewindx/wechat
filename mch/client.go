@@ -212,6 +212,15 @@ func (client *Client) toMap(repBody io.Reader) (rep map[string]string, err error
 		}
 	}
 
+	resultCode := rep["result_code"]
+	if resultCode != ResultCodeSuccess {
+		return nil, &BizError{
+			ResultCode:  resultCode,
+			ErrCode:     rep["err_code"],
+			ErrCodeDesc: rep["err_code_des"],
+		}
+	}
+
 	appId := rep["appid"]
 	if appId != client.appID {
 		return nil, fmt.Errorf("appid mismatch, have: %s, want: %s", appId, client.appID)
@@ -248,14 +257,6 @@ func (client *Client) toMap(repBody io.Reader) (rep map[string]string, err error
 		return nil, fmt.Errorf("sign mismatch,\nhave: %s,\nwant: %s", signHave, signWant)
 	}
 
-	resultCode := rep["result_code"]
-	if resultCode != ResultCodeSuccess {
-		return nil, &BizError{
-			ResultCode:  resultCode,
-			ErrCode:     rep["err_code"],
-			ErrCodeDesc: rep["err_code_des"],
-		}
-	}
 	return rep, nil
 }
 
