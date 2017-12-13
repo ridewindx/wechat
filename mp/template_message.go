@@ -16,7 +16,7 @@ type TemplateMsg struct {
 	Data map[string]TemplateMsgValue `json:"data"`
 }
 
-func (c *Client) SendTemplateMessage(msg *TemplateMsg, values ...map[string]string) (msgID string, err error) {
+func (c *Client) SendTemplateMessage(msg *TemplateMsg, values ...map[string]string) (msgID int64, err error) {
 	if msg.Data == nil && len(values) > 0 {
 		msg.Data = make(map[string]TemplateMsgValue)
 		for k, v := range values[0] {
