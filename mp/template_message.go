@@ -26,7 +26,7 @@ func (c *Client) SendTemplateMessage(msg *TemplateMsg, values ...map[string]stri
 
 	var rep struct {
 		Err
-		MsgID string `json:"msgid"`
+		MsgID int64 `json:"msgid"`
 	}
 
 	u := BASE_URL.Join("/message/template/send")
