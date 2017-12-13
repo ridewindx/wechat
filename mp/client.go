@@ -107,6 +107,8 @@ func (c *Client) Post(u URL, req, rep interface{}) error {
 		return err
 	}
 
+	fmt.Printf("post: %s\n", buf.String())
+
 	return c.call(u, rep, nil, func(u URL) (*http.Response, error) {
 		return c.Client.Post(string(u), "application/json; charset=utf-8", buf)
 	})
