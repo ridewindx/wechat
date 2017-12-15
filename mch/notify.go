@@ -173,6 +173,8 @@ func (nm *NotifyHandler) Serve(w io.Writer, r *http.Request, payNotifyHandler fu
 			nm.replyError(w, err.Error())
 			return
 		}
+
+		nm.reply(w, ReturnCodeSuccess, "OK")
 		return
 	}
 
@@ -208,6 +210,7 @@ func (nm *NotifyHandler) Serve(w io.Writer, r *http.Request, payNotifyHandler fu
 	orderInfo, err := getOrderInfo(req)
 	if err != nil {
 		nm.replyError(w, err.Error())
+		return
 	}
 
 	msg := NotifyMsg{
@@ -220,6 +223,7 @@ func (nm *NotifyHandler) Serve(w io.Writer, r *http.Request, payNotifyHandler fu
 	err = payNotifyHandler(&msg)
 	if err != nil {
 		nm.replyError(w, err.Error())
+		return
 	}
 
 	nm.reply(w, ReturnCodeSuccess, "OK")
