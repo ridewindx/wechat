@@ -41,7 +41,7 @@ const (
 	ErrCodeNOTENOUGH     = "NOTENOUGH"     // 用户帐号余额不足，请用户充值或更换支付卡后再支付
 	ErrCodeORDERNOTEXIST = "ORDERNOTEXIST" // 查询系统中不存在此交易订单号
 
-	ErrCodeBIZERR_NEED_RETRY     = "BIZERR_NEED_RETRY"     // 并发情况下业务被拒绝，商户重试即可解决	号，请不要更换商户退款单号
+	ErrCodeBIZERR_NEED_RETRY     = "BIZERR_NEED_RETRY"     // 并发情况下业务被拒绝，商户重试即可解决
 	ErrCodeERROR                 = "ERROR"                 // 申请退款业务发生错误
 	ErrCodeUSER_ACCOUNT_ABNORMAL = "USER_ACCOUNT_ABNORMAL" // 退款请求失败，用户帐号注销
 	ErrCodeINVALID_REQ_TOO_MUCH  = "INVALID_REQ_TOO_MUCH"  // 连续错误请求数过多被系统短暂屏蔽，请在1分钟后再来重试

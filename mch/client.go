@@ -133,7 +133,7 @@ func (client *Client) postXML(withCert bool, relativeURL string, req map[string]
 	rep, err = client.postToMap(withCert, url, buffer, isEnterprisePay)
 	if err != nil {
 		bizError, ok := err.(*BizError)
-		if !ok || bizError.ErrCode != ErrCodeSYSTEMERROR {
+		if !ok || (bizError.ErrCode != ErrCodeSYSTEMERROR && bizError.ErrCode != ErrCodeBIZERR_NEED_RETRY) {
 			return
 		}
 		url = switchReqURL(url)

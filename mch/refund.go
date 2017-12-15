@@ -60,54 +60,58 @@ func (client *Client) Refund(req *RefundRequest) (rep *RefundResponse, err error
 		reqMap["refund_desc"] = req.RefundDesc
 	}
 
-	m2, err := client.PostXMLWithCert("/secapi/pay/refund", reqMap)
+	repMap, err := client.PostXMLWithCert("/secapi/pay/refund", reqMap)
 
 	rep = &RefundResponse{
-		TransactionId: m2["transaction_id"],
-		OutTradeNo:    m2["out_trade_no"],
-		OutRefundNo:   m2["out_refund_no"],
-		RefundId:      m2["refund_id"],
-		FeeType:       m2["fee_type"],
-		CashFeeType:   m2["cash_fee_type"],
+		TransactionId: repMap["transaction_id"],
+		OutTradeNo:    repMap["out_trade_no"],
+		OutRefundNo:   repMap["out_refund_no"],
+		RefundId:      repMap["refund_id"],
+		FeeType:       repMap["fee_type"],
+		CashFeeType:   repMap["cash_fee_type"],
 	}
 
-	rep.RefundFee, err = strconv.Atoi(m2["refund_fee"])
+	rep.RefundFee, err = strconv.Atoi(repMap["refund_fee"])
 	if err != nil {
 		return nil, err
 	}
-	rep.TotalFee, err = strconv.Atoi(m2["total_fee"])
-	if err != nil {
-		return nil, err
+	if totalFee, ok := repMap["total_fee"]; ok {
+		rep.TotalFee, err = strconv.Atoi(totalFee)
+		if err != nil {
+			return nil, err
+		}
 	}
-	rep.CashFee, err = strconv.Atoi(m2["cash_fee"])
-	if err != nil {
-		return nil, err
+	if cashFee, ok := repMap["cash_fee"]; ok {
+		rep.CashFee, err = strconv.Atoi(cashFee)
+		if err != nil {
+			return nil, err
+		}
 	}
-	if str := m2["settlement_refund_fee"]; str != "" {
+	if str := repMap["settlement_refund_fee"]; str != "" {
 		rep.SettlementRefundFee, err = strconv.Atoi(str)
 		if err != nil {
 			return nil, err
 		}
 	}
-	if str := m2["settlement_total_fee"]; str != "" {
+	if str := repMap["settlement_total_fee"]; str != "" {
 		rep.SettlementTotalFee, err = strconv.Atoi(str)
 		if err != nil {
 			return nil, err
 		}
 	}
-	if str := m2["cash_refund_fee"]; str != "" {
+	if str := repMap["cash_refund_fee"]; str != "" {
 		rep.CashRefundFee, err = strconv.Atoi(str)
 		if err != nil {
 			return nil, err
 		}
 	}
-	if str := m2["coupon_refund_fee"]; str != "" {
+	if str := repMap["coupon_refund_fee"]; str != "" {
 		rep.CouponRefundFee, err = strconv.Atoi(str)
 		if err != nil {
 			return nil, err
 		}
 	}
-	if str := m2["coupon_refund_count"]; str != "" {
+	if str := repMap["coupon_refund_count"]; str != "" {
 		rep.CouponRefundCount, err = strconv.Atoi(str)
 		if err != nil {
 			return nil, err

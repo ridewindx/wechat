@@ -28,12 +28,11 @@ type QueryRefundResponse struct {
 	TransactionId string // 微信订单号
 	OutTradeNo    string // 商户系统内部的订单号
 
-	TotalFee int // 订单总金额，单位为分，只能为整数
-	CashFee  int // 现金支付金额，单位为分，只能为整数
-
 	RefundItems []RefundItem
 
 	// 可选返回
+	TotalFee int // 订单总金额，单位为分，只能为整数
+	CashFee  int // 现金支付金额，单位为分，只能为整数
 	SettlementTotalFee int    // 应结订单金额=订单金额-非充值代金券金额，应结订单金额<=订单金额
 	FeeType            string // 订单金额货币类型，符合ISO 4217标准的三位字母代码，默认人民币：CNY
 	CashFeeType        string // 货币类型，符合ISO 4217标准的三位字母代码，默认人民币：CNY
@@ -44,12 +43,12 @@ type RefundItem struct {
 	RefundId         string       // 微信退款单号
 	RefundFee        int          // 申请退款金额
 	RefundStatus     RefundStatus // 退款状态
-	RefundRecvAccout string       // 退款入账账户
 
 	// 可选返回
 	RefundChannel       string    // 退款渠道
 	SettlementRefundFee int       // 退款金额=申请退款金额-非充值代金券退款金额，退款金额<=申请退款金额
 	RefundAccount       string    // 退款资金来源
+	RefundRecvAccout string       // 退款入账账户
 	RefundSuccessTime   time.Time // 退款成功时间
 	// TODO: coupon list
 }
@@ -81,17 +80,23 @@ func (client *Client) QueryRefund(req *QueryRefundRequest) (rep *QueryRefundResp
 		CashFeeType:   repMap["cash_fee_type"],
 	}
 
-	rep.TotalFee, err = strconv.Atoi(repMap["total_fee"])
-	if err != nil {
-		return nil, err
+	if str, ok := repMap["total_fee"]; ok {
+		rep.TotalFee, err = strconv.Atoi(str)
+		if err != nil {
+			return nil, err
+		}
 	}
-	rep.CashFee, err = strconv.Atoi(repMap["cash_fee"])
-	if err != nil {
-		return nil, err
+	if str, ok := repMap["cash_fee"]; ok {
+		rep.CashFee, err = strconv.Atoi(str)
+		if err != nil {
+			return nil, err
+		}
 	}
-	rep.SettlementTotalFee, err = strconv.Atoi(repMap["settlement_total_fee"])
-	if err != nil {
-		return nil, err
+	if str, ok := repMap["settlement_total_fee"]; ok {
+		rep.SettlementTotalFee, err = strconv.Atoi(str)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	refundCount, err := strconv.Atoi(repMap["refund_count"])

@@ -9,6 +9,11 @@ import (
 	"go.uber.org/zap"
 	"github.com/jiudaoyun/wechat"
 	"io"
+	"encoding/base64"
+	"github.com/nanjishidu/gomini/gocrypto"
+	"bytes"
+	"strconv"
+	"time"
 )
 
 type NotifyMsg struct {
@@ -20,8 +25,20 @@ type NotifyMsg struct {
 	OrderInfo
 }
 
+type RefundNotifyMsg struct {
+	TransactionID string
+	OutTradeNO string
+	RefundID string
+	OutRefundNO string
+	TotalFee int
+	RefundFee int
+	RefundStatus RefundStatus
+	SuccessTime time.Time
+}
+
 type NotifyHandler struct {
-	handler func(*NotifyMsg) error
+	payNotifyHandler func(*NotifyMsg) error
+	refundNotifyHandler func(*RefundNotifyMsg) error
 
 	appID  string
 	mchID  string
@@ -33,13 +50,13 @@ type NotifyHandler struct {
 	*zap.SugaredLogger
 }
 
-func NewNotifyHandler(appID, mchID, apiKey string, handler ...func(*NotifyMsg) error) *NotifyHandler {
-	var h func(*NotifyMsg) error
-	if len(handler) > 0 {
-		h = handler[0]
-	}
+func NewNotifyHandler(appID, mchID, apiKey string, payNofityHandler func(*NotifyMsg) error, refundNotifyHandler func(*RefundNotifyMsg) error) *NotifyHandler {
+	apiKeyMD5 := fmt.Sprintf("%x", md5.Sum([]byte(apiKey)))
+	gocrypto.SetAesKey(apiKeyMD5)
+
 	return &NotifyHandler{
-		handler: h,
+		payNotifyHandler: payNofityHandler,
+		refundNotifyHandler: refundNotifyHandler,
 
 		appID:  appID,
 		mchID:  mchID,
@@ -65,10 +82,10 @@ func (nm *NotifyHandler) replyError(w io.Writer, reason string) {
 }
 
 func (nm *NotifyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	nm.Serve(w, r, nm.handler)
+	nm.Serve(w, r, nm.payNotifyHandler, nm.refundNotifyHandler)
 }
 
-func (nm *NotifyHandler) Serve(w io.Writer, r *http.Request, handler func(*NotifyMsg) error) {
+func (nm *NotifyHandler) Serve(w io.Writer, r *http.Request, payNotifyHandler func(*NotifyMsg) error, refundNotifyHandler func(*RefundNotifyMsg) error) {
 	if r.Method != "POST" {
 		nm.replyError(w, "unexpected HTTP Method: "+r.Method)
 		return
@@ -87,17 +104,6 @@ func (nm *NotifyHandler) Serve(w io.Writer, r *http.Request, handler func(*Notif
 		err = &Error{
 			ReturnCode: returnCode,
 			ReturnMsg:  req["return_msg"],
-		}
-		nm.replyError(w, err.Error())
-		return
-	}
-
-	resultCode := req["result_code"]
-	if resultCode != ResultCodeSuccess {
-		err = &BizError{
-			ResultCode:  resultCode,
-			ErrCode:     req["err_code"],
-			ErrCodeDesc: req["err_code_des"],
 		}
 		nm.replyError(w, err.Error())
 		return
@@ -137,6 +143,41 @@ func (nm *NotifyHandler) Serve(w io.Writer, r *http.Request, handler func(*Notif
 		}
 	}
 
+	// 1. refund order notify
+	if reqInfo, ok := req["req_info"]; ok {
+		encrypted, err := base64.StdEncoding.DecodeString(reqInfo)
+		if err != nil {
+			nm.replyError(w, err.Error())
+			return
+		}
+		decrypted, err := gocrypto.AesECBDecrypt(encrypted)
+		if err != nil {
+			nm.replyError(w, err.Error())
+			return
+		}
+		nm.Infof("wechat callback: %s", decrypted)
+		info, err := DecodeXML(bytes.NewBuffer(decrypted))
+		if err != nil {
+			nm.replyError(w, err.Error())
+			return
+		}
+
+		msg, err := getRefundNotifyMsg(info)
+		if err != nil {
+			nm.replyError(w, err.Error())
+			return
+		}
+
+		err = refundNotifyHandler(msg)
+		if err != nil {
+			nm.replyError(w, err.Error())
+			return
+		}
+		return
+	}
+
+	// 2. pay order notify
+
 	haveSign := req["sign"]
 	var wantSign string
 	switch signType := req["sign_type"]; signType {
@@ -153,6 +194,17 @@ func (nm *NotifyHandler) Serve(w io.Writer, r *http.Request, handler func(*Notif
 		return
 	}
 
+	resultCode := req["result_code"]
+	if resultCode != ResultCodeSuccess {
+		err = &BizError{
+			ResultCode:  resultCode,
+			ErrCode:     req["err_code"],
+			ErrCodeDesc: req["err_code_des"],
+		}
+		nm.replyError(w, err.Error())
+		return
+	}
+
 	orderInfo, err := getOrderInfo(req)
 	if err != nil {
 		nm.replyError(w, err.Error())
@@ -165,10 +217,39 @@ func (nm *NotifyHandler) Serve(w io.Writer, r *http.Request, handler func(*Notif
 		SubMchID: req["sub_mch_id"],
 		OrderInfo: *orderInfo,
 	}
-	err = handler(&msg)
+	err = payNotifyHandler(&msg)
 	if err != nil {
 		nm.replyError(w, err.Error())
 	}
 
 	nm.reply(w, ReturnCodeSuccess, "OK")
+}
+
+func getRefundNotifyMsg(req map[string]string) (*RefundNotifyMsg, error) {
+	totalFee, err := strconv.Atoi(req["total_fee"])
+	if err != nil {
+		return nil, err
+	}
+	refundFee, err := strconv.Atoi(req["refund_fee"])
+	if err != nil {
+		return nil, err
+	}
+	var successTime time.Time
+	if str, ok := req["success_time"]; ok {
+		successTime, err = ParseTime(str)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return &RefundNotifyMsg{
+		TransactionID: req["transaction_id"],
+		OutTradeNO: req["out_trade_no"],
+		RefundID: req["refund_id"],
+		OutRefundNO: req["out_refund_no"],
+		TotalFee: totalFee,
+		RefundFee: refundFee,
+		RefundStatus: RefundStatus(req["refund_status"]),
+		SuccessTime: successTime,
+	}, nil
 }
