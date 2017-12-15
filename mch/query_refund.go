@@ -9,8 +9,8 @@ import (
 type RefundStatus string
 
 const (
-	RefundStatusSUCCESS     RefundStatus = "SUCCESS "     // 退款成功
-	RefundStatusREFUNDCLOSE RefundStatus = "REFUNDCLOSE " // 退款关闭
+	RefundStatusSUCCESS     RefundStatus = "SUCCESS"     // 退款成功
+	RefundStatusREFUNDCLOSE RefundStatus = "REFUNDCLOSE" // 退款关闭
 	RefundStatusPROCESSING  RefundStatus = "PROCESSING"   // 退款处理中
 	RefundStatusCHANGE      RefundStatus = "CHANGE"       // 退款异常，退款到银行发现用户的卡作废或者冻结了，导致原路退款银行卡失败，可前往商户平台交易中心，手动处理此笔退款
 )
