@@ -155,7 +155,7 @@ func (nm *NotifyHandler) Serve(w io.Writer, r *http.Request, payNotifyHandler fu
 			nm.replyError(w, err.Error())
 			return
 		}
-		nm.Infof("wechat callback: %s", decrypted)
+		// nm.Infof("wechat callback: %s", decrypted)
 		info, err := DecodeXML(bytes.NewBuffer(decrypted))
 		if err != nil {
 			nm.replyError(w, err.Error())
